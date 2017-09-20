@@ -1,0 +1,91 @@
+---
+title: 
+author: Dominic Pearce
+output:
+    github_document
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
+```
+
+## USS graphs - this is largely ripped straight from Cigdem
+
+```{r}
+uss_v2 <- read.delim("/Volumes/igmm/sims-lab/Cigdem/My Docs_CSelli/EU_MSCA_IF_Andy_CS_in UEDIN/analysis_new big dormancy data/Rfiles/1_patient_USS_v2.txt")
+uss_v2[uss_v2 == ""] <- NA
+unwanted <- which(uss_v2$X.volume==77.42)
+uss <- uss_v2[-unwanted,]
+uss$biopsy <- ifelse(!is.na(uss$sampling.type), 0, NA)
+uss$biopsy_days <- sapply(1:nrow(uss), function(x) {
+  ifelse(!is.na(uss$sampling.type[x]), uss$days[x], NA)
+})
+uss$rec <- ifelse(uss$rec_status == 1, 1, NA)
+uss <- uss[!is.na(uss$X.volume),]
+uss_trimmed <- uss[,c(7, 11:14)]
+
+
+#####for presentation
+#plot
+#step 1 - Dormants only
+
+ggplot(uss[uss$dorm.group.v2=="D",]) +
+  geom_vline(xintercept = 120, linetype = "longdash", colour="grey30") +
+  geom_hline(yintercept=50, linetype = "longdash", colour="grey30") +
+  geom_line(aes(x = days, y = X.volume, group=patient.no, colour=dorm.group.v2),
+            size=1.5, alpha = 0.7) +
+  theme_pander() +
+  #geom_smooth(aes(x = days, y = X.volume, group=dorm.group.v2), size=1.5, colour="green") +
+  scale_colour_manual(values = c("#ff6f69", "#5bc0de")) +
+  scale_y_continuous(name="Tumour volume (USS)",limits= c(0, 120),
+                     breaks=seq(0, 120, 20)) +
+  scale_x_continuous(name="Days",limits= c(0, 360),
+                     breaks=seq(0, 360, 30)) +
+  theme(axis.title = element_text(color = "black", size = 12)) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(legend.position = 'none')
+
+##########
+#dom edit#
+##########
+#step 2 - w/Acquired Resistants
+
+ggplot(uss[uss$dorm.group.v2!="Excl",]) +
+  geom_vline(xintercept = 120, linetype = "longdash", colour="grey30") +
+  geom_hline(yintercept=50, linetype = "longdash", colour="grey30") +
+  geom_line(aes(x = days, y = X.volume, group=patient.no, colour=dorm.group.v2, alpha = dorm.group.v2),
+            size=1.5) +
+  theme_pander() +
+  #geom_smooth(aes(x = days, y = X.volume, group=dorm.group.v2), size=1.5, colour="green") +
+  scale_colour_manual(values = c("#ff6f69", "#5bc0de")) + 
+  scale_alpha_manual(values = c(0.25, 0.8)) + 
+  scale_y_continuous(name="Tumour volume (USS)",limits= c(0, 120),
+                     breaks=seq(0, 120, 20)) +
+  scale_x_continuous(name="Days",limits= c(0, 360),
+                     breaks=seq(0, 360, 30)) +
+  theme(axis.title = element_text(color = "black", size = 12)) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(legend.position = 'none')
+
+#step 3 - w/Recurrence (bu graph su an calismiyor cunku rec kolonunu sildim, rec_status olarak guncel kolon ekledim, bu  graph zaten sadece sunum icin kullanildi, gercegi yansitmiyordu) 
+
+ggplot(uss[uss$dorm.group.v2!="Excl",]) +
+  geom_vline(xintercept = 120, linetype = "longdash", colour="grey30") +
+  geom_hline(yintercept=50, linetype = "longdash", colour="grey30") +
+  geom_line(aes(x = days, y = X.volume, group=patient.no, colour=dorm.group.v2, alpha = dorm.group.v2),
+            size=1.5) +
+  geom_point(aes(x = days, y = X.volume, group=patient.no, colour=as.character(rec)),
+             size=2, pch = 15, data = uss[uss$dorm.group.v2!="Excl" & uss$days > 120,]) +
+  theme_pander() +
+  #geom_smooth(aes(x = days, y = X.volume, group=dorm.group.v2), size=1.5, colour="green") +
+  scale_colour_manual(values = c("BLACK", "#ff6f69", "#5bc0de")) +
+  scale_alpha_manual(values = c(0.25, 0.8)) + 
+  scale_y_continuous(name="Tumour volume (USS)",limits= c(0, 120),
+                     breaks=seq(0, 120, 20)) +
+  scale_x_continuous(name="Days",limits= c(0, 360),
+                     breaks=seq(0, 360, 30)) +
+  
+  theme(axis.title = element_text(color = "black", size = 12)) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(legend.position = 'none')
+```

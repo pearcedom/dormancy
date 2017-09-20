@@ -1,0 +1,119 @@
+---
+title: Dormancy Subtyping
+author: Dominic Pearce
+output:
+    github_document
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
+```
+
+```{r}
+library(tidyverse)
+library(genefu)
+library(AIMS)
+library(pamr)
+library(Biobase)
+library(ggthemes)
+library(cowplot); theme_set(theme_grey())
+source("/Volumes/igmm/sims-lab/Dominic/functions/idReplace.R")
+```
+
+```{r}
+eset <- read_rds("../output/dorm-v4.rds")
+```
+
+## Convert to entrezgene ids (genefu requires this) and package as a new eset
+
+```{r}
+xpr_entrez <- idReplace(exprs(eset), id.in = "hgnc_symbol", id.out = "entrezgene")
+phenoData <- new("AnnotatedDataFrame", data = pData(eset),  varMetadata = varMetadata(eset))
+eset_entrez <- new("ExpressionSet", exprs = as.matrix(xpr_entrez), phenoData = phenoData)
+```
+
+## Calculate subtypes
+
+```{r}
+ano_dfr <- data.frame(probe = row.names(eset_entrez), 
+                      EntrezGene.ID = row.names(eset_entrez), 
+                      rownames = row.names(eset_entrez))
+
+ssp_lst <- list(ssp2003, ssp2006, pam50)
+names(ssp_lst) <- c("sorlie2003", "hu2006", "pam50")
+
+preds_base <- lapply(c("sorlie2003", "hu2006", "pam50"), function(ssp){
+           dfr <- data.frame(pred = intrinsic.cluster.predict(ssp_lst[[ssp]], t(exprs(eset_entrez)), ano_dfr, do.mapping = TRUE)$subtype,
+                             method = ssp)
+           dfr$sample <- row.names(dfr)
+           dfr
+                      }) %>% do.call(rbind, .)
+row.names(preds) <- NULL
+```
+
+### As some samples have multiple biopsies within the same window (on-, long-term etc) we need to remove one them. 
+
+```{r}
+preds <-  preds_base[which(!grepl("e", preds_base$sample)),]
+```
+
+## Combine with phenoData
+
+```{r}
+preds_mrg <- merge(preds, pData(eset_entrez), by.x = "sample", by.y = "ID_D120days_3cat")
+preds_mrg$timep <- ifelse(preds_mrg$time.point_3cat == 1, "Diagnosis", ifelse(preds_mrg$time.point_3cat == 2, "On-treatment", "Long-term"))
+preds_mrg$time_tile <- factor(preds_mrg$timep, levels = c("Long-term", "On-treatment", "Diagnosis"))
+preds_mrg$time_hist <- factor(preds_mrg$timep, levels = c("Diagnosis", "On-treatment", "Long-term"))
+
+#order by time to final biopsy
+tmp <- preds_mrg[preds_mrg$time.point_3cat == 4 & preds_mrg$method == "pam50",]
+preds_mrg$patient.no <- factor(preds_mrg$patient.no, levels = tmp$patient.no[order(tmp$days_newinfo)])
+
+
+p_tile <- ggplot(preds_mrg[preds_mrg$method == "pam50",], aes(patient.no, y = time_tile, fill = pred)) + 
+    geom_tile(width = 1, colour = "WHITE") + 
+    scale_fill_manual(values=c("#1f78b4", "#a6cee3", "#fb9a99", "#e31a1c", "#b2df8a"), 
+                    limits=c("LumA", "LumB", "Her2", "Basal", "Normal")) +
+    facet_grid(method~dorm.group_v4, scales = 'free', space = 'free') +
+    labs(fill = "Subtype") + 
+    ggthemes::theme_pander() + 
+    theme(axis.title.y = element_blank(),
+          axis.title.x = element_blank(),
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          panel.spacing.x = unit(1.25, "lines"),
+          legend.position = "bottom")
+p_tile
+#ggsave("../figs/pam50-subtypes.png")
+```
+
+## Display the relative change in subtypes as histogram?
+
+```{r}
+p_hist <- ggplot(preds_mrg[preds_mrg$method == "pam50",], aes(x = pred, fill = pred)) + 
+    geom_histogram(stat = 'count') + 
+    scale_fill_manual(values=c("#1f78b4", "#a6cee3", "#fb9a99", "#e31a1c", "#b2df8a"), 
+                    limits=c("LumA", "LumB", "Her2", "Basal", "Normal")) +
+    theme_pander() + 
+    theme(legend.position = 'none') + 
+    facet_grid(dorm.group_v4 ~ time_hist, scale = 'free_y')
+p_hist
+```
+
+## Combine
+
+```{r}
+plot_grid(p_tile, p_hist, ncol = 1, rel_heights = c(1, 2), scale = 0.98)
+#ggsave("../figs/pam50-subtypes.png")
+```
+
+## Cigdem wanted the numbers of each subtype at diagnosis
+
+```{r}
+
+diag_subtypes <- sapply(c("D", "ND"), function(x){
+                            table(preds_mrg[which(preds_mrg$timep == "Diagnosis" &
+                                                  preds_mrg$dorm.group_v4 == x),]$pred)
+                    }) %>% data.frame
+#write_csv(diag_subtypes, "../output/diagnostic-subtype-distribution.csv")
+```

@@ -1,0 +1,29 @@
+---
+title: Pathway Analyses 
+author: Dominic Pearce
+output:
+    github_document
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
+```
+
+```{r}
+library(ReactomePA)
+library(tidyverse)
+source("../../../functions/convert-id-to-gene-symbol-with-biomart.R")
+```
+
+## Most variable 500 in treated samples
+
+```{r}
+mv_tre <- read_lines("../output/mv500-treated.txt") %>% 
+    id2GeneSymbolBM(filters = "hgnc_symbol", attributes = "entrezgene")
+
+tre_PA <- enrichPathway(gene=na.omit(unique(mv_tre$entrezgene)), pvalueCutoff=0.05, readable=T)
+
+dotplot(tre_PA)
+
+enrichMap(tre_PA, layout=igraph::layout.kamada.kawai, vertex.label.cex = 1)
+```

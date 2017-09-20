@@ -1,0 +1,179 @@
+---
+title: 
+author: Dominic Pearce
+output:
+    github_document
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
+```
+
+```{r}
+library(tidyverse)
+library(Biobase)
+library(siggenes)
+library(RankProd)
+library(reshape2)
+library(ggthemes)
+```
+
+```{r}
+dorm <- read_rds("../output/dorm.rds")
+```
+
+# Within groups
+
+## Dormants
+- remove non-dormants and timepoint 1 samples
+- find sample pairs
+- if there are two timepoint 2 samples only take the early (e) version 
+ 
+```{r}
+dorm_d <- dorm[, dorm$dorm.group_v3 == "D" & dorm$time.point_3cat != 1]
+pairs_d24 <- which(colnames(dorm_d) %>% gsub("\\-[1-9]", "", .) %>% table() == 2) %>% names() %>% paste0("^", .)
+dorm_d24_dbls <- dorm_d[, sapply(pairs_d24, function(x) grep(x, colnames(dorm_d))) %>% unlist()]
+dorm_d24 <- dorm_d24_dbls[, -c(grep("2e", colnames(dorm_d24_dbls)) - 1, grep("4e", colnames(dorm_d24_dbls)))]
+```
+
+### Calculate differential expression
+
+```{r}
+cl_d24 <- rep(c(-1, 1), ncol(dorm_d24)/2) * rep(1:(ncol(dorm_d24)/2), each = 2)
+
+sam_d24 <- sam(exprs(dorm_d24), cl_d24, rand = 221)
+findDelta(sam_d24, 0.05) # 1.132684
+geneset_d24 <- list.siggenes(sam_d24, 1.132684)
+
+dorm_d24sig <- dorm_d24[geneset_d24,]
+upreg <- (exprs(dorm_d24sig)[, seq(2, 58, 2)] - exprs(dorm_d24sig)[, seq(1, 58, 2)]) %>% rowMeans() > 0
+upreg_dfr <- data.frame(Var1 = names(upreg), is.up = upreg)
+```
+
+### I think this was a not-so-smart way to do it = IGNORE
+
+```{r, eval = FALSE, echo = FALSE}
+dorm_mlt <- melt(exprs(dorm[geneset_d24,]))
+dorm_mrg_base <- merge(dorm_mlt, upreg_dfr, by = "Var1")
+dorm_mrg <- merge(dorm_mrg_base, pData(dorm), by.x = "Var2", by.y = "ID_D120days")
+
+#the dimensions of mlt and mrg potential don't match but too fuzz brained to figure it out CHECK!!!!!!!
+
+ggplot(dorm_mrg, aes(x = as.character(time.point_3cat), y = value)) + 
+    geom_line(aes(group = patient.no, colour = is.up)) + 
+    geom_boxplot(alpha = 0.7) + 
+    facet_grid(is.up~dorm.group_v3) + 
+    theme_pander()
+
+ggplot(dorm_mrg, aes(x = Var2, y = Var1, fill = value)) +
+    geom_tile() +
+    facet_wrap(~dorm.group_v3, scales = 'free_x', ncol = 1)
+```
+
+### Calculate for row-wise and column-wise mean expression and then plot, facetting by dormancy group and differential expression direction
+
+#### Row-wise (i.e. per-gene means)
+
+```{r}
+genemean_dfr <- lapply(c("D", "ND"), function(class){
+    subdorm <- dorm[, dorm$dorm.group_v3 == class]
+    lapply(c("\\-1", "\\-2", "\\-4"), function(x) {
+                           row_means <- exprs(subdorm[geneset_d24, grep(x, colnames(subdorm))]) %>% rowMeans()
+                           data.frame(gene = names(row_means), xpr =row_means, timepoint = substring(x, 3, 3), class = class)
+    }) %>% do.call(rbind, .)
+}) %>% do.call(rbind, .)
+genemean_mrg <- merge(genemean_dfr, upreg_dfr, by.x = "gene", by.y = "Var1")
+genemean_mrg$direction <- ifelse(genemean_mrg$is.up == TRUE, "Up", "Down")
+
+ggplot(genemean_mrg, aes(x = timepoint, y = xpr)) + 
+    geom_line(aes(group = gene, colour = class), alpha = 0.2) + 
+    geom_boxplot(alpha = 0.7, notch = TRUE) + 
+    facet_grid(direction~class) + 
+    scale_colour_manual(values = c("#ff6f69", "#5bc0de")) +
+    labs(title = "Dormant DE genes 2-4 - genewise", 
+         subtitle = "Mean (per-gene) expression of DE genes between On- and Long-term timepoints were\ncalculated in Dormant patients and then applied to both dormancy classes\nacross all timepoints",
+         x = "Biopsy",
+         y = "Mean Expression") + 
+    theme_pander() + 
+    theme(legend.position = 'none',
+          panel.background = element_blank(), 
+          panel.grid.major = element_line(colour = "#d9d9d9", linetype = 1),
+          panel.grid.minor = element_line(colour = "#d9d9d9", linetype = 1))
+```
+
+#### Column-wise (i.e. per-sample means)
+
+```{r}
+it_lst <- list(Up = row.names(upreg_dfr[which(upreg_dfr$is.up),]), Down = row.names(upreg_dfr[-which(upreg_dfr$is.up),]))
+sampmean_dfr <- lapply(c("Up", "Down"), function(direction){
+    col_means <- exprs(dorm[it_lst[[direction]],]) %>% colMeans()
+    data.frame(id = names(col_means), xpr = col_means, direction  = direction)
+}) %>% do.call(rbind, .)
+sampmean_mrg <- merge(sampmean_dfr, pData(dorm), by.x = "id", by.y = "ID_D120days_3cat")
+
+ggplot(sampmean_mrg, aes(x = time.point_3cat, y = xpr)) + 
+    geom_line(aes(group = patient.no, colour = dorm.group_v3)) + 
+    geom_boxplot(alpha = 0.7, notch = TRUE) + 
+    facet_grid(direction~dorm.group_v3) + 
+    scale_colour_manual(values = c("#ff6f69", "#5bc0de")) +
+    scale_x_discrete(labels = c("Pre", "On", "Long-term")) + 
+    labs(title = "Dormant DE genes 2-4 - samplewise", subtitle = "Mean (per-sample) expression of DE genes between On- and Long-term\ntimpoints were calculated in Dormant patients and then applied to both\ndormancy classes across all timepoints",
+    x = "Biopsy",
+    y = "Mean Expression") + 
+    theme_pander() + 
+    theme(legend.position = 'none',
+          panel.background = element_blank(), 
+          panel.grid.major = element_line(colour = "#d9d9d9", linetype = 1),
+          panel.grid.minor = element_line(colour = "#d9d9d9", linetype = 1))
+#ggsave("../../../writing/PhD/3yr/figs/pres/de-d24.png")
+```
+
+## Desensitiseds
+
+### Organise as above
+ 
+```{r}
+dorm_n <- dorm[, dorm$dorm.group_v3 == "ND" & dorm$time.point_3cat != 1]
+pairs_n24 <- which(colnames(dorm_n) %>% gsub("\\-[1-9]", "", .) %>% table() == 2) %>% names() %>% paste0("^", .)
+dorm_n24_dbls <- dorm_n[, sapply(pairs_n24, function(x) grep(x, colnames(dorm_n))) %>% unlist()]
+dorm_n24 <- dorm_n24_dbls[, -c(grep("2e", colnames(dorm_n24_dbls)) - 1, grep("4e", colnames(dorm_n24_dbls)))]
+```
+
+### Calculate differential expression
+
+```{r}
+cl_n24 <- rep(c(-1, 1), ncol(dorm_n24)/2) * rep(1:(ncol(dorm_n24)/2), each = 2)
+
+sam_n24 <- sam(exprs(dorm_n24), cl_n24, rand = 221)
+```
+
+# Across groups
+
+## SAM
+
+
+```{r}
+dorm_4 <- dorm[, dorm$time.point_3cat == 4]
+
+cl <- ifelse(dorm_4$dorm.group_v3 == "D", 0, 1)
+
+sam_out <- sam(exprs(dorm_4), cl, rand = 221)
+```
+
+#### No genes differentially expressed at FDR<=0.05 by SAM
+
+
+## RankProduct
+
+```{r, eval = FALSE}
+RP_out <- RP(exprs(dorm_4), cl, logged=TRUE, na.rm=FALSE, plot=FALSE, rand=123)
+```
+
+```{r}
+topgenes <- topGene(RP_out, cutoff = 0.05)
+
+geneset <- row.names(dorm_4)[data.frame(do.call(rbind, topgenes))$gene.index]
+
+#write_lines(geneset, "../output/rp-geneset.txt")
+```
+

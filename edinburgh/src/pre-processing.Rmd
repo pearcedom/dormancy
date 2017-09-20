@@ -1,0 +1,35 @@
+---
+title: Dorm finalisation
+author: Dominic Pearce
+output:
+    github_document
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center', eval = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(Biobase)
+```
+
+## Dorm classification v4
+
+```{r, eval = FALSE}
+dorm_base <- read_rds("../data/1_Dorm_120_hgnc_v2_3cat.Rds")
+#remove Exluded samples immediately and write
+dorm <- dorm_base[, dorm_base$dorm.group_v4 != "Excl"]
+write_rds(dorm, "../output/dorm-v4.rds")
+```
+
+## Dorm classification v3 (obsolete)
+
+```{r}
+dorm_base <- read_rds("../data/redundant-1_Dorm_120_hgnc_v2_3cat.Rds")
+#remove Exluded samples immediately and write
+dorm <- dorm_base[, dorm_base$dorm.group_v3 != "Excl"]
+write_rds(dorm, "../output/dorm-v3.rds")
+```
+
+
