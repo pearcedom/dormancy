@@ -1,38 +1,28 @@
----
-title: Clinical data curation
-author: Dominic Pearce
-output:
-    github_document
----
+Clinical data curation
+================
+Dominic Pearce
 
-```{r, echo = FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
-```
-
-```{r}
+``` r
 library(tidyverse)
 library(Biobase)
 library(affy)
 library(a4Base)
 ```
 
-The clinical information is a mess so we need to do some extensive curation and tidying. We'll
-start with the USS data and begin by filling in missing values.
+The clinical information is a mess so we need to do some extensive curation and tidying. We'll start with the USS data and begin by filling in missing values.
 
-## USS
+USS
+---
 
-```{r}
+``` r
 uss_dfr <- read.csv("../data/batch-2-uss.csv")
 ```
 
-For `Patient.ID` we need to simply replace NAs with the first previous value. So we take the
-indexes where the values are, calculate the space inbetween them and fill that space with the
-correct value. Note we add an additional value which is the number of rows + 1 to deal with the
-final edge case - we therefore only loop through the length of idx - 1.
+For `Patient.ID` we need to simply replace NAs with the first previous value. So we take the indexes where the values are, calculate the space inbetween them and fill that space with the correct value. Note we add an additional value which is the number of rows + 1 to deal with the final edge case - we therefore only loop through the length of idx - 1.
 
 We'll wrap this in a function as we'll use the same approach for the `Sample.ID` column.
 
-```{r}
+``` r
 fillNAs <- function(vec){
     vec = as.character(vec)
     idx <- c(which(!is.na(vec)), nrow(uss_dfr) + 1)
@@ -49,10 +39,9 @@ uss_dfr$patient_id <- fillNAs(uss_dfr$Patient.ID)
 #uss_dfr$sample_id <- fillNAs(uss_dfr$Sample.ID) #...actually this doesn't make sense to do
 ```
 
-Now we add two columns, specifiying whether the row corresponds to a biopsy, a USS measurement or 
-both. In addition we add another column detailing which time point each biopsy corresponds to.
+Now we add two columns, specifiying whether the row corresponds to a biopsy, a USS measurement or both. In addition we add another column detailing which time point each biopsy corresponds to.
 
-```{r}
+``` r
 uss_dfr$is_uss <- ifelse(is.na(uss_dfr$Relative.Volume), FALSE, TRUE)
 uss_dfr$is_biopsy <- ifelse(is.na(uss_dfr$Surgical.Excision..TH..or.Core.Biospy..CB.), FALSE, TRUE)
 
@@ -63,10 +52,9 @@ uss_dfr$timepoint <- ifelse(uss_dfr$Days.from.Treatment <= 0,
                                    "long-term"))
 ```
 
-Finally we delete now obsolete columns, rename any which are needed but haven't yet been modified 
-and re-order columns
+Finally we delete now obsolete columns, rename any which are needed but haven't yet been modified and re-order columns
 
-```{r}
+``` r
 uss_dfr[, c("Patient.ID", "Surgical.Excision..TH..or.Core.Biospy..CB.")] <- NULL
 
 uss_dfr <- uss_dfr[, c("patient_id", "Sample.ID", "timepoint", "is_biopsy", 
@@ -75,16 +63,16 @@ colnames(uss_dfr) <-  c("patient_id", "sample_id", "timepoint", "is_biopsy",
                         "is_uss", "relative_vol", "days_treated", "date")
 ```
 
-# Clinical
+Clinical
+========
 
-```{r}
+``` r
 clin_dfr <- read.csv("../data/batch-2-clin.csv")
 ```
 
-Not too many changes to make here, only patient 283 in `clin_dfr` is called 283R in `uss_dfr` so 
-we'll remove the Rs before merging both in `patient_id` and `sample_id` columns.
+Not too many changes to make here, only patient 283 in `clin_dfr` is called 283R in `uss_dfr` so we'll remove the Rs before merging both in `patient_id` and `sample_id` columns.
 
-```{r}
+``` r
 uss_dfr$patient_id[grepl("R", uss_dfr$patient_id)] <- "283"
 uss_dfr$sample_id <- lapply(as.character(uss_dfr$sample_id), function(x){
                                 ifelse(grepl("R", x), gsub("R", "", x), x)
@@ -93,18 +81,18 @@ uss_dfr$sample_id <- lapply(as.character(uss_dfr$sample_id), function(x){
 ussclin_dfr <- merge(uss_dfr, clin_dfr, by.x = 'patient_id', by.y = 'LA.Number', all = TRUE)
 ```
 
-# Expression
+Expression
+==========
 
-Lastly we can add to our pheno data by parsing information from the sample names, before combining
-expression and pheno data as a complete expression set
+Lastly we can add to our pheno data by parsing information from the sample names, before combining expression and pheno data as a complete expression set
 
-```{r}
+``` r
 georgeset <- read_rds("~/Desktop/temp-store/georgeset-sep-frma-fselect-loess.rds")
 ```
 
 This requires some complicated and careful calls : double-check, double-check, double-check
 
-```{r}
+``` r
 georgeset$is_freshfrozen <- grepl("FF", colnames(georgeset), ignore.case = TRUE)
 
 georgeset$is.control <- grepl("VHRR", colnames(georgeset), ignore.case = TRUE)
@@ -148,17 +136,18 @@ pData(georgeset) <- lapply(unique(georgeset$patient), function(x){
 
 Merge the final version of the phenotypic data and create the final expressionSet
 
-```{r}
+``` r
 pheno <- merge(ussclin_dfr, pData(georgeset), by = 'sample_id', all.y = TRUE)
 pheno$has_clin <- ifelse(pheno$is_biopsy, TRUE, FALSE)
 row.names(pheno) <- pheno$xpr_id
 
 identical(sort(colnames(exprs(georgeset))), sort(row.names(pheno)))
+```
 
+    ## [1] TRUE
 
+``` r
 georgeset_out <- georgeset[, order(colnames(exprs(georgeset)))]
 pData(georgeset_out) <- pheno[order(row.names(pheno)),]
 #write_rds(georgeset_out, "~/Desktop/temp-store/georgeset-sep-frma-fselect-loess-clin.Rds")
 ```
-
-

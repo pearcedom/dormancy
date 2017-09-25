@@ -1,0 +1,80 @@
+---
+title: Georgetown Pre-processing
+author: Dominic Pearce
+output:
+    github_document
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
+```
+
+```{r}
+library(affy)
+library(tidyverse)
+library(Biobase)
+library(frma)
+library(hgu133plus2frmavecs)
+library(knitr)
+```
+
+## First we'll read in our .cel files in batch, normalise using frma, feature select and loess normalise - though not necessarily in that order! 
+
+#### Create AffyBatch from .CEL files
+
+```{r, eval = FALSE}
+setwd("../data/Edinburgh\ Second\ Batch\ 170\ Samples")
+batch_2 <- ReadAffy()
+setwd("../../src/")
+```
+
+#### Feature selection
+
+```{r}
+ap <- mas5calls(batch_2)
+
+#subset calls by source material
+ap_ffpe <- exprs(ap)[, which(!grepl("FF", colnames(ap), ignore.case = TRUE))]
+ap_ff <- exprs(ap)[, which(grepl("FF", colnames(ap), ignore.case = TRUE))]
+
+#calculate present calls in a source material specific manner
+calls_ffpe <- sapply(row.names(ap), function(x){
+    sum(ap_ffpe[x, ] != "A") > 10
+})
+present_ffpe <- row.names(ap)[which(calls_ffpe)]
+ 
+calls_ff <- sapply(row.names(ap), function(x){
+    sum(ap_ff[x, ] != "A") >= 7
+})
+present_ff <- row.names(ap)[which(calls_ff)]
+
+#retreive common probes and write out
+present_common <- intersect(present_ffpe, present_ff)
+
+data.frame(present_10 = c(length(present_ffpe), 
+                             length(present_ff), 
+                             length(present_common)),
+            material = c("FFPE", "FF", "Common")
+            ) %>% knitr::kable()
+
+#write_lines(present_common, "../output/probes-present-common.txt")
+```
+
+#### 2-step normalisation - frma and loess 
+
+```{r}
+data(hgu133plus2frmavecs)
+georgeset_all <- frma(batch_2, input.vecs = hgu133plus2frmavecs) 
+georgeset <- georgeset_all[present_common,]
+
+
+write_rds(georgeset)
+
+#g_mtx <- affy::normalize.loess(exprs(georgeset))
+#write.csv(g_mtx, "../output/loess-norm-xpr.txt")
+
+##this was a weird error about mismatched dimnames but fixed by setting colnames explicitly
+#colnames(georgeset) <- colnames(exprs(georgeset))
+#exprs(georgeset) <- g_mtx
+#write_rds(georgeset, "../output/batch-2-frma-loess.Rds")
+```

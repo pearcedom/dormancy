@@ -14,6 +14,7 @@ library(tidyverse)
 library(Biobase)
 library(sva)
 library(reshape2)
+library(testthat)
 library(ggthemes)
 library(cowplot); theme_set(theme_gray())
 source("../../../../functions/mostVar.R")
@@ -23,15 +24,22 @@ source("../../../../functions/library/mdsArrange.R")
 #### We have our frma and loess normalised expression set, but there still clearly exists a big batch difference between FF and FFPE source material. This is evident in terms of the overall sample distributions
 
 ```{r}
-georgeset_no_loess <- read_rds("../output/georgeset.rds")
-georgeset <- read_rds("../output/georgeset-frma.rds")
+#georgeset <- read_rds("../output/georgeset-frma.rds")
+#georgeset <- read_rds("../output/gset-frma-featured.rds")
+#georgeset_allprobe <- read_rds("../output/georgeset-frma.rds")
+#present_common <- read_lines("../output/probes-present-common.txt")
+#georgeset <- georgeset_allprobe[present_common,]
+
+georgeset <- read_rds("~/Desktop/temp-store/georgeset-sep-frma-fselect-loess-clin.Rds")
 ```
+
+## Pre-correction
 
 ```{r}
 batchEffectDists <- function(mtx_input){
     #arrange
     george_mlt <- melt(mtx_input)
-    george_mrg <- merge(george_mlt, pData(georgeset), by.x = "Var2", by.y = 'xpr_id')
+    george_mrg <- base::merge(george_mlt, pData(georgeset), by.x = "Var2", by.y = 0)
     george_mrg$Var2 <- factor(george_mrg$Var2, levels = unique(george_mrg$Var2[order(george_mrg$is_freshfrozen)]))
     #boxplot
     p_box <- ggplot(george_mrg, aes(x = Var2, y = value, fill = is_freshfrozen)) + 
@@ -40,13 +48,13 @@ batchEffectDists <- function(mtx_input){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank())
     #densityplot
-    p_dist <- ggplot(george_mrg, aes(x = value, colour = is_freshfrozen, group = Var2)) + 
-        geom_density() + 
+    p_dist <- ggplot(george_mrg, aes(x = value, colour = is_freshfrozen, group = Var2), alpha = 0.05) + 
+        geom_line(stat = 'density', alpha = 0.2) + 
         theme_pander() +    
-        theme(legend.position = 'none',
+        theme(legend.position = 'bottom',
             axis.ticks.x = element_blank(),
-            axis.text.x = element_blank())
-    #combine
+            axis.text.x = element_blank()) 
+        #combine
     plot_grid(p_box, p_dist, ncol = 1)
 }
 
@@ -60,7 +68,7 @@ batchEffectMDS <- function(mtx_input, colour_by){
     #arrange
     mv500 <- mostVar(mtx_input, 500) %>% row.names()
     arg500 <- mdsArrange(mtx_input[mv500,]) 
-    mds_input <- merge(arg500, pData(georgeset), by.x = 'ids', by.y = 'xpr_id')
+    mds_input <- base::merge(arg500, pData(georgeset), by.x = 'ids', by.y = 0)
     #and plot
     ggplot(mds_input, aes_string("x", "y", colour = colour_by)) + 
         geom_point() + 
@@ -85,29 +93,59 @@ cowplot::plot_grid(plotlist = plot_lst, ncol = 3)
 batchEffectMDS(exprs(georgeset), "timepoint")
 ```
 
+## Correction and post-correction
+
 #### We'll attempt to correct for this source material-specific batch effect using ComBat
 
 ```{r}
-g_raw <- exprs(georgeset)
-g_cb <- ComBat(exprs(georgeset), batch = georgeset$is_freshfrozen)
-#source("../../../../functions/xpn-conor.R")
-#g_cb <- xpn(exprs(georgeset)[georgeset$is_freshfrozen], exprs(georgeset)[!georgeset$is_freshfrozen])
-
-present_common <- read_lines("../output/probes-present-common.txt")
-g_cb <- g_cb[present_common,]
+g_cb <- ComBat(exprs(georgeset), batch = as.numeric(georgeset$is_freshfrozen))
 ```
+
+#### And XPN
+
+```{r, eval = FALSE}
+#lapply(list.files("~/Desktop/temp-store/inSilicoMerging/R/"), function(file){
+#           print(file)
+#           source(file.path("~/Desktop/temp-store/inSilicoMerging/R", file))
+#            })
+#source("~/Desktop/temp-store/inSilicoMerging/R/xpn.R")
+#source("~/Desktop/temp-store/inSilicoMerging/R/util.R")
+#
+##g_xpn <- merge(list(georgeset[, georgeset$is_freshfrozen], georgeset[, !georgeset$is_freshfrozen]), method = "XPN")
+#aux <- xpn(georgeset[, georgeset$is_freshfrozen], georgeset[, !georgeset$is_freshfrozen])
+#g_xpn <- a4Base::combineTwoExpressionSet(aux[[1]], aux[[2]])
+##write_rds(aux, "~/Desktop/temp-store/gset-frma-feature-loess-xpn.rds")
+```
+
+ComBat
 
 ```{r}
 batchEffectDists(g_cb)
 ```
 
+XPN
+
+```{r}
+#batchEffectDists(exprs(g_xpn))
+```
+
 #### Better? What about by MDS?
+
+ComBat
 
 ```{r}
 batchEffectMDS(g_cb, "is_freshfrozen")
 ```
 
-#### Still a clear divide by source material but let's check the FF-FFPE replicate samples only
+XPN
+
+```{r}
+#batchEffectMDS(exprs(g_xpn), "is_freshfrozen")
+```
+
+#### Prior to feature selecting, the FF vs FFPE effect was still very evident post-correction but now the clear divide caused by source material has seemingly all but been removed.
+
+#### Let's now check the FF-FFPE replicate samples only
 
 ```{r}
 material_rep_ids <- c("50-1", "50-2", "50-3", "50-4", "135-1", "135-4", "188-1", "268-1", "268-2", "298-1", "298-2", "347-3", "413-1", "413-2", "416-1", "416-2")
@@ -115,13 +153,23 @@ material_rep_vec <- rep(FALSE, ncol(georgeset))
 material_rep_vec[which(georgeset$sample_id %in% material_rep_ids)] <- TRUE
 
 batchEffectDists(g_cb[, material_rep_vec])
-batchEffectMDS(g_cb[, material_rep_vec], "is_freshfrozen")
+batchEffectMDS(g_cb[, material_rep_vec], "sample_id") + geom_point(aes(size = is_freshfrozen))
+
+#batchEffectDists(g_xpn[, material_rep_vec])
+#batchEffectMDS(g_xpn[, material_rep_vec], "is_freshfrozen")
 ```
 
-#### Supplementary
-
-For reference the non-loess normalised, rma normalised data
 
 ```{r}
-batchEffectDists(exprs(georgeset_no_loess))
+pheno <- pData(georgeset)
+exprs(georgeset) <- g_cb
+
+test_that("eset overwrite worked as expected", {
+              expect_identical(exprs(georgeset), g_cb)
+             expect_identical(pData(georgeset), pheno)
+           })
+#write_rds(georgeset, "../data/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
 ```
+
+
+
