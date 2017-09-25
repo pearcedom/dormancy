@@ -18,8 +18,8 @@ First we'll read in our .cel files in batch, normalise using frma, feature selec
 #### Create AffyBatch from .CEL files
 
 ``` r
-dir_vec <- c("../data/Edinburgh\ Second\ Batch\ 170\ Samples/ff",
-             "../data/Edinburgh\ Second\ Batch\ 170\ Samples/ffpe")
+dir_vec <- c("../../data/Edinburgh\ Second\ Batch\ 170\ Samples/ff",
+             "../../data/Edinburgh\ Second\ Batch\ 170\ Samples/ffpe")
 
 affybatch_lst <- lapply(dir_vec, function(dir){
                             setwd(dir)
