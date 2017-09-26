@@ -1,5 +1,5 @@
 ---
-title:
+title: Clinical data curation
 author: Dominic Pearce
 output:
     github_document
@@ -46,7 +46,7 @@ fillNAs <- function(vec){
 }
 
 uss_dfr$patient_id <- fillNAs(uss_dfr$Patient.ID)
-#uss_dfr$sample_id <- fillNAs(uss_dfr$Sample.ID) #actually this doesn't make sense to do
+#uss_dfr$sample_id <- fillNAs(uss_dfr$Sample.ID) #...actually this doesn't make sense to do
 ```
 
 Now we add two columns, specifiying whether the row corresponds to a biopsy, a USS measurement or 
@@ -99,19 +99,15 @@ Lastly we can add to our pheno data by parsing information from the sample names
 expression and pheno data as a complete expression set
 
 ```{r}
-georgeset <- read_rds("../output/georgeset-frma.Rds")
+georgeset <- read_rds("~/Desktop/temp-store/georgeset-sep-frma-fselect-loess.rds")
 ```
 
 This requires some complicated and careful calls : double-check, double-check, double-check
 
 ```{r}
-georgeset$is_freshfrozen <- ifelse(grepl("FF", colnames(georgeset), ignore.case = TRUE),
-                                   TRUE,
-                                   FALSE)
+georgeset$is_freshfrozen <- grepl("FF", colnames(georgeset), ignore.case = TRUE)
 
-georgeset$is.control <- ifelse(grepl("VHRR", colnames(georgeset), ignore.case = TRUE), 
-                                   TRUE, 
-                                   FALSE)
+georgeset$is.control <- grepl("VHRR", colnames(georgeset), ignore.case = TRUE)
 
 #the largest sample id is in the hundreds so chop to 3 characters and then remove anything that's 
 #not a number
@@ -137,6 +133,7 @@ georgeset$is.replicate <- ifelse(grepl("-([0-9])-([0-9])([a-z])_", colnames(geor
                                    TRUE, 
                                    FALSE)
 
+#this is capturing way too many samples it looks like
 pData(georgeset) <- lapply(unique(georgeset$patient), function(x){
            subset_dfr <- pData(georgeset)[which(georgeset$patient == x),]
            ff_tbl <- subset_dfr$is_freshfrozen %>% table()    
@@ -154,9 +151,14 @@ Merge the final version of the phenotypic data and create the final expressionSe
 ```{r}
 pheno <- merge(ussclin_dfr, pData(georgeset), by = 'sample_id', all.y = TRUE)
 pheno$has_clin <- ifelse(pheno$is_biopsy, TRUE, FALSE)
+row.names(pheno) <- pheno$xpr_id
 
-pData(georgeset) <- pheno
-#write_rds(georgeset, "../output/georgeset.rds")
+identical(sort(colnames(exprs(georgeset))), sort(row.names(pheno)))
+
+
+georgeset_out <- georgeset[, order(colnames(exprs(georgeset)))]
+pData(georgeset_out) <- pheno[order(row.names(pheno)),]
+#write_rds(georgeset_out, "~/Desktop/temp-store/georgeset-sep-frma-fselect-loess-clin.Rds")
 ```
 
 

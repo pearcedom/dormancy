@@ -17,23 +17,19 @@ library(reshape2)
 library(testthat)
 library(ggthemes)
 library(cowplot); theme_set(theme_gray())
-source("../../../../functions/mostVar.R")
-source("../../../../functions/library/mdsArrange.R")
+source("../../../../../functions/mostVar.R")
+source("../../../../../functions/library/mdsArrange.R")
 ```
 
 #### We have our frma and loess normalised expression set, but there still clearly exists a big batch difference between FF and FFPE source material. This is evident in terms of the overall sample distributions
 
 ```{r}
-#georgeset <- read_rds("../output/georgeset-frma.rds")
-#georgeset <- read_rds("../output/gset-frma-featured.rds")
-#georgeset_allprobe <- read_rds("../output/georgeset-frma.rds")
-#present_common <- read_lines("../output/probes-present-common.txt")
-#georgeset <- georgeset_allprobe[present_common,]
-
 georgeset <- read_rds("~/Desktop/temp-store/georgeset-sep-frma-fselect-loess-clin.Rds")
 ```
 
-## Pre-correction
+## Visual determination
+
+### Pre-correction
 
 ```{r}
 batchEffectDists <- function(mtx_input){
@@ -93,7 +89,7 @@ cowplot::plot_grid(plotlist = plot_lst, ncol = 3)
 batchEffectMDS(exprs(georgeset), "timepoint")
 ```
 
-## Correction and post-correction
+### Correction and post-correction
 
 #### We'll attempt to correct for this source material-specific batch effect using ComBat
 
@@ -154,6 +150,7 @@ XPN
 material_rep_ids <- c("50-1", "50-2", "50-3", "50-4", "135-1", "135-4", "188-1", "268-1", "268-2", "298-1", "298-2", "347-3", "413-1", "413-2", "416-1", "416-2")
 material_rep_vec <- rep(FALSE, ncol(georgeset))
 material_rep_vec[which(georgeset$sample_id %in% material_rep_ids)] <- TRUE
+georgeset$is_material_rep <- material_rep_vec
 
 batchEffectDists(g_cb[, material_rep_vec])
 batchEffectMDS(g_cb[, material_rep_vec], "sample_id") + geom_point(aes(size = is_freshfrozen))
@@ -165,14 +162,68 @@ batchEffectMDS(g_cb[, material_rep_vec], "sample_id") + geom_point(aes(size = is
 #### And write out final .Rds to be used in the actual analysis
 
 ```{r}
-pheno <- pData(georgeset)
-exprs(georgeset) <- g_cb
+georgeset_cb <- georgeset
+exprs(georgeset_cb) <- g_cb
 
+#test we haven't broken our expressionset as can happen!
 test_that("eset overwrite worked as expected", {
-              expect_identical(exprs(georgeset), g_cb)
-             expect_identical(pData(georgeset), pheno)
+              expect_identical(g_cb, exprs(georgeset_cb))
+             expect_identical(pData(georgeset), pData(georgeset_cb))
            })
+
 #write_rds(georgeset, "../data/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
+```
+
+## Statistical determination 
+
+We can losely define the batch-sepcific *inter*-patienty and *intra*-patient heterogeneity as biological variation, just as the replicate sample variation can be almost entirely attributed to technical variation or noise. Additionally, the overall variability will be explained by a combination of the above.
+
+Therefore, post-ComBat, if the 'biological' variation remains constant post-ComBat, whislt the technical variation is removed we can be confident that our correction has been effective but not to the degree of removing bioloical signal.
+
+```{r}
+getSampleCors <- function(mtx){
+    cor_mtx <- cor(mtx)
+    diag(cor_mtx) <- NA
+    colMeans(cor_mtx, na.rm = TRUE)
+}
+
+input_lst <- list(raw_all = exprs(georgeset), 
+                  raw_ff = exprs(georgeset)[, georgeset$is_freshfrozen],
+                  raw_ffpe = exprs(georgeset)[, !georgeset$is_freshfrozen],
+                  raw_rep = exprs(georgeset)[, georgeset$is_material_rep],
+                  cb_all = exprs(georgeset_cb), 
+                  cb_ff = exprs(georgeset_cb)[, georgeset_cb$is_freshfrozen],
+                  cb_ffpe = exprs(georgeset_cb)[, !georgeset_cb$is_freshfrozen],
+                  cb_rep = exprs(georgeset_cb)[, georgeset_cb$is_material_rep]
+                  )
+
+cor_dfr <- lapply(names(input_lst), function(x){
+                      data.frame(cor = getSampleCors(input_lst[[x]]), comparison = x)
+                  }) %>% do.call(rbind, .)
+cor_dfr$correction <- factor(ifelse(grepl("raw", cor_dfr$comparison), "RAW", "CB"), 
+                             levels = c("RAW", "CB"))
+
+ggplot(cor_dfr, aes(x = comparison, cor)) + 
+    geom_boxplot(outlier.size = 0) + 
+    geom_jitter(width = 0.1, alpha = 0.7) +
+    facet_wrap(~correction, nrow = 1, scales = 'free_x') + 
+    labs(x = "Comparison Type", 
+         y = "Correlation", 
+         title = "Pre- and post-correction correlation") +
+    theme_pander() +
+    theme(panel.spacing = unit(5, "lines"))
+```
+
+Happily we can see that whilst our overall and replicate correlations have drastically improved, this has not been at the expense of our batch-specific correlations - i.e. biological variation has been preserved.
+
+```{r}
+lapply(names(input_lst), function(x){
+           data.frame(Correlation = mean(cor_dfr[cor_dfr$comparison == x,]$cor), 
+                      Comparison = x) 
+         }) %>% 
+    do.call(rbind, .) %>%
+    t() %>% 
+    knitr::kable()
 ```
 
 

@@ -1,0 +1,43 @@
+---
+title: USS classification
+author: Dominic Pearce
+output:
+    github_document
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
+```
+
+```{r}
+library(tidyverse)
+library(ggthemes)
+```
+
+```{r}
+uss_dfr <- read.csv("../../output/uss-clin.csv")
+
+head(uss_dfr[uss_dfr$is_uss,])
+
+dormant_dfr <- lapply(unique(uss_dfr$patient_id), function(patient){
+                          int_dfr <- uss_dfr[uss_dfr$is_uss & uss_dfr$patient_id == patient,]
+                          ord_dfr <- int_dfr[order(int_dfr$days_treated),]
+                          data.frame(is_dormant = ord_dfr$relative_vol[nrow(ord_dfr)] < 60,
+                                     patient_id = patient)
+}) %>% do.call(rbind, .) %>% na.omit
+
+ussdorm_dfr <- merge(dormant_dfr, uss_dfr, by = 'patient_id') 
+
+ggplot(ussdorm_dfr, aes(x = days_treated, 
+                        y = relative_vol, 
+                        group = patient_id, 
+                        colour = is_dormant)) + 
+    geom_hline(yintercept = 60, linetype = 3) + 
+    geom_line() + 
+    theme_pander()
+
+ggplot(ussdorm_dfr, aes(x = as.character(patient_id), y = days_treated)) +
+    geom_point(colour = "#1f78b4", alpha = 0.5, data = ussdorm_dfr[ussdorm_dfr$is_uss,]) + #blue
+    geom_point(colour = "#e31a1c", alpha = 0.5, data = ussdorm_dfr[ussdorm_dfr$is_biopsy,]) #red
+
+```

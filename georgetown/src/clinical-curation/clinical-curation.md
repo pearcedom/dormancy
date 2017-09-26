@@ -79,6 +79,8 @@ uss_dfr$sample_id <- lapply(as.character(uss_dfr$sample_id), function(x){
                         }) %>% unlist()
 
 ussclin_dfr <- merge(uss_dfr, clin_dfr, by.x = 'patient_id', by.y = 'LA.Number', all = TRUE)
+
+#write.csv(ussclin_dfr, "../../output/uss-clin.csv")
 ```
 
 Expression
