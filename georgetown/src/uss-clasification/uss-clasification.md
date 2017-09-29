@@ -102,7 +102,7 @@ probeset_dfr <- id2GeneSymbolBM(ids = c("PCNA", "MCM2", "MKI67"),
                 attributes = "affy_hg_u133a")
 probeset_dfr$affy_hg_u133a[probeset_dfr$affy_hg_u133a == ""] <- NA
 probeset_all <- as.character(na.omit(probeset_dfr$affy_hg_u133a))
-probeset_available <- row.names(georgeset)[which(row.names(georgeset) %in% probeset)]
+probeset_available <- row.names(georgeset)[which(row.names(georgeset) %in% probeset_all)]
 
 xpr <- exprs(georgeset[probeset_available, xprdorm_ind])
 
@@ -114,7 +114,8 @@ ggplot(xpr_mrg, aes(x = days_treated, y = value, colour = is_dormant, group = pa
     geom_line() +
     facet_wrap(is_dormant~Var1, scales = 'free', ncol = 5) + 
 #    theme_pander() + 
-    theme(legend.position = 'bottom')
+    theme(legend.position = 'bottom') + 
+    ggtitle("Unfinished")
 ```
 
 <img src="uss-clasification_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-7-1.png" style="display: block; margin: auto;" />
