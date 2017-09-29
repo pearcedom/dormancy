@@ -63,7 +63,7 @@ uss_dfr$timepoint <- ifelse(uss_dfr$Days.from.Treatment <= 0,
                                    "long-term"))
 ```
 
-Finally we delete now obsolete columns, rename any which are needed but haven't yet been modified 
+No we delete now obsolete columns, rename any which are needed but haven't yet been modified 
 and re-order columns
 
 ```{r}
@@ -73,6 +73,36 @@ uss_dfr <- uss_dfr[, c("patient_id", "Sample.ID", "timepoint", "is_biopsy",
                        "is_uss", "Relative.Volume", "Days.from.Treatment", "Date")]
 colnames(uss_dfr) <-  c("patient_id", "sample_id", "timepoint", "is_biopsy", 
                         "is_uss", "relative_vol", "days_treated", "date")
+```
+
+And finally we use the uss_dfr to calculate the dormancy status of our patients
+
+```{r}
+status_dfr <- lapply(unique(uss_dfr$patient_id), function(patient){
+                          status_dfr <- data.frame(patient_id = patient, is_dormant = NA) 
+                          #subset by patient
+                          int_dfr <- uss_dfr[uss_dfr$is_uss & uss_dfr$patient_id == patient,]
+                          ord_dfr <- int_dfr[order(int_dfr$days_treated),]
+                          #get pre-90 day subset
+                          pre3 <- ord_dfr[ord_dfr$days_treated <= 90, ]
+
+                          #if there is a pre-90 day volume decrease by at least 40% & any 
+                          #subsequent increase, relative to the lowest pre-90 measurement, 
+                          #of >=5% then it's desensitised, else it's dormant. If there is no
+                          #pre-90 day decrease then it is excluded from the study
+                          if(!is.na(pre3$patient_id) & 
+                             any(pre3$relative_vol <= 60)){                             
+                              first_under60 <- which(ord_dfr$relative_vol <= 60)[1]
+                              decreased_dfr <- ord_dfr[first_under60:nrow(ord_dfr),]
+                              status_dfr$is_dormant <- !any(decreased_dfr$relative_vol -
+                                                        decreased_dfr$relative_vol[[1]] >= 5)
+                          } else {
+                              status_dfr$is_dormant <- NA
+                          }
+                          status_dfr
+}) %>% do.call(rbind, .)
+
+uss_dfr <- merge(status_dfr, uss_dfr, by = 'patient_id')
 ```
 
 # Clinical
@@ -160,7 +190,7 @@ identical(sort(colnames(exprs(georgeset))), sort(row.names(pheno)))
 
 georgeset_out <- georgeset[, order(colnames(exprs(georgeset)))]
 pData(georgeset_out) <- pheno[order(row.names(pheno)),]
-#write_rds(georgeset_out, "~/Desktop/temp-store/georgeset-sep-frma-fselect-loess-clin.Rds")
+#write_rds(georgeset_out, "../../output/georgeset-sep-frma-fselect-loess-clin.Rds")
 ```
 
 

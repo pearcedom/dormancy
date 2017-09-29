@@ -24,7 +24,7 @@ source("../../../../../functions/library/mdsArrange.R")
 #### We have our frma and loess normalised expression set, but there still clearly exists a big batch difference between FF and FFPE source material. This is evident in terms of the overall sample distributions
 
 ```{r}
-georgeset <- read_rds("~/Desktop/temp-store/georgeset-sep-frma-fselect-loess-clin.Rds")
+georgeset <- read_rds("../../output/georgeset-sep-frma-fselect-loess-clin.Rds")
 ```
 
 ## Visual determination
