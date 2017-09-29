@@ -6,7 +6,7 @@ output:
 ---
 
 ```{r, echo = FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center', fig.width = 8)
 ```
 
 ```{r}
@@ -110,7 +110,8 @@ ggplot(xpr_mrg, aes(x = days_treated, y = value, colour = is_dormant, group = pa
     geom_line() +
     facet_wrap(is_dormant~Var1, scales = 'free', ncol = 5) + 
 #    theme_pander() + 
-    theme(legend.position = 'bottom')
+    theme(legend.position = 'bottom') + 
+    ggtitle("Unfinished")
 
 ```
 
