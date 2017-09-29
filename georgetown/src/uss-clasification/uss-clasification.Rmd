@@ -20,9 +20,26 @@ uss_dfr <- read.csv("../../output/uss-clin.csv")
 head(uss_dfr[uss_dfr$is_uss,])
 
 dormant_dfr <- lapply(unique(uss_dfr$patient_id), function(patient){
+                          #subset by patient
                           int_dfr <- uss_dfr[uss_dfr$is_uss & uss_dfr$patient_id == patient,]
                           ord_dfr <- int_dfr[order(int_dfr$days_treated),]
-                          data.frame(is_dormant = ord_dfr$relative_vol[nrow(ord_dfr)] < 60,
+                          #split into pre- and post-90 day subset
+                          pre3 <- ord_dfr[ord_dfr$days_treated <= 90, ]
+                          post3 <- ord_dfr[ord_dfr$days_treated > 90, ]
+                          #if there is a pre-90 day volume decrease by at least 40% & any 
+                          #subsequent increase, relative to the lowest pre-90 measurement, 
+                          #of >=5% then it's desensitised, else it's dormant. If there is no
+                          #pre-90 day decrease then it is excluded from the study
+
+                          if(any(!pre3$relative_vol <= 60)){
+                              FALSE
+                          } else if()
+
+    ord_dfr[-c(1:(which(ord_dfr$relative_vol <= 60)-1)),]
+
+                          data.frame(is_dormant = all(any(pre3$relative_vol <= 60) &
+                                                       any(max(post3$relative_vol) -
+                                                           min(pre3$relative_vol) <= -5)),
                                      patient_id = patient)
 }) %>% do.call(rbind, .) %>% na.omit
 
