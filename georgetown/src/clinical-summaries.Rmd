@@ -39,7 +39,7 @@ columns_e <- c("dorm.group_v4", "time.point_3cat", "age", "T", "N", "M", "ER", "
 for(x in columns_e){
            dfr <- data.frame(table(pData(edset)[,x]))
            colnames(dfr) <- c(x, "Freq")
-           print(kable(dfr))
+           kable(dfr)
 }
 
 ```
