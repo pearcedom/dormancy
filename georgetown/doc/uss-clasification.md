@@ -28,7 +28,7 @@ ggplot(dormant_dfr, aes(x = days_treated,
     geom_hline(yintercept = 60, linetype = 3) + 
     geom_line() + 
     scale_y_continuous(breaks = c(0, 60, 100, 200)) +
-    scale_x_continuous(breaks = c(0, 90, 120, 500, 1000)) +
+    scale_x_continuous(breaks = c(0, 90, 500, 1000)) +
     theme_pander() +
     theme(legend.position = 'bottom')
 ```
