@@ -6,7 +6,7 @@ output:
 ---
 
 ```{r, echo = FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center', results = 'asis')
 ```
 
 ```{r}
@@ -25,7 +25,7 @@ columns_g <- c("is_dormant", "timepoint", "Age", "Surgery.Performed", "T", "N", 
 for(x in columns_g){
                    dfr <- data.frame(table(pData(georgeset)[,x]))
                    colnames(dfr) <- c(x, "Freq")
-                   kable(dfr)
+                   print(kable(dfr))
                 } 
 ```
 
@@ -39,7 +39,7 @@ columns_e <- c("dorm.group_v4", "time.point_3cat", "age", "T", "N", "M", "ER", "
 for(x in columns_e){
            dfr <- data.frame(table(pData(edset)[,x]))
            colnames(dfr) <- c(x, "Freq")
-           kable(dfr)
+           print(kable(dfr))
 }
 
 ```
