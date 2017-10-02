@@ -1,15 +1,8 @@
----
-title: Dormancy Subtyping
-author: Dominic Pearce
-output:
-    github_document
----
+Dormancy Subtyping
+================
+Dominic Pearce
 
-```{r, echo = FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.align = 'center')
-```
-
-```{r}
+``` r
 library(tidyverse)
 library(genefu)
 library(AIMS)
@@ -20,22 +13,23 @@ library(cowplot); theme_set(theme_grey())
 source("/Volumes/igmm/sims-lab/Dominic/functions/idReplace.R")
 ```
 
-```{r}
-edset <- read_rds("../../../../edinburgh/output/dorm-v4.rds")
+``` r
+edset <- read_rds("../../../edinburgh/output/dorm-v4.rds")
 edset$timepoint <- ifelse(edset$time.point_3cat == 1, "diagnosis", 
                            ifelse(edset$time.point_3cat == 2, "on-treatment", "long-term"))
 edset$xpr_id <- edset$ID_D120days_3cat
 edset$patient_id <- edset$patient.no
 edset$is_dormant <- edset$dorm.group_v4 == "D"
-georgeset_base <- read_rds("../../../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
+georgeset_base <- read_rds("../../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
 georgeset <- georgeset_base[, !is.na(georgeset_base$timepoint)]
 
 eset_lst <- list(edset, georgeset)
 ```
 
-## Convert to entrezgene ids (genefu requires this) and package as a new eset
+Convert to entrezgene ids (genefu requires this) and package as a new eset
+--------------------------------------------------------------------------
 
-```{r}
+``` r
 id_vec <- c("hgnc_symbol", "affy_hg_u133_plus_2")
 entrez_lst <- lapply(1:2, function(x){
                          xpr_entrez <- idReplace(exprs(eset_lst[[x]]), 
@@ -50,10 +44,10 @@ entrez_lst <- lapply(1:2, function(x){
 })
 ```
 
-## Calculate subtypes
+Calculate subtypes
+------------------
 
-```{r}
-
+``` r
 preds_lst <- lapply(entrez_lst, function(eset_entrez){
     ano_dfr <- data.frame(probe = row.names(eset_entrez), 
                           EntrezGene.ID = row.names(eset_entrez), 
@@ -100,3 +94,4 @@ preds_lst <- lapply(entrez_lst, function(eset_entrez){
 plot_grid(plotlist = preds_lst, ncol = 1)
 ```
 
+<img src="/Volumes/igmm/sims-lab/Dominic/labbook/dormancy/georgetown/doc/subtyping_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-5-1.png" style="display: block; margin: auto;" />

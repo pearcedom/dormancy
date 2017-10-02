@@ -9,21 +9,39 @@ output:
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
 ```
 
-## Georgetown dormancy data - clinical summaries
-
 ```{r}
 library(readr)
 library(knitr)
 library(Biobase)
+```
 
-georgeset <- read_rds("../../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
+## Georgetown dormancy data summaries
 
-columns <- c("is_dormant", "timepoint", "Age", "Surgery.Performed", "T", "N", "M", "ER", "Diagnostic.CB.Grade", "HER2.IHC", "HER2.FISH", "Overall.HER2", "No.of.Pos.Nodes", "Chemo", "Radiotherapy", "ET.Drugs", "Any.Recurrence", "Alive.Dead", "is_freshfrozen")
+```{r}
+georgeset_base <- read_rds("../../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
 
-lapply(columns, function(x){
+columns_g <- c("is_dormant", "timepoint", "Age", "Surgery.Performed", "T", "N", "M", "ER", "Diagnostic.CB.Grade", "HER2.IHC", "HER2.FISH", "Overall.HER2", "No.of.Pos.Nodes", "Chemo", "Radiotherapy", "ET.Drugs", "Any.Recurrence", "Alive.Dead", "is_freshfrozen")
+
+lapply(columns_g, function(x){
                    dfr <- data.frame(table(pData(georgeset)[,x]))
                    colnames(dfr) <- c(x, "Freq")
                    kable(dfr)
                 }) 
 ```
 
+## Edinburgh dormancy data summaries
+
+```{r}
+edset <- read_rds("../../../edinburgh/output/dorm-v4.rds")
+
+colnames(pData(edset))
+
+columns_e <- c("dorm.group_v4", "time.point_3cat", "age", "T", "N", "M", "ER", "Grade", "HER2", "HER2.FISH", "drug.type", "proteomics", "recur.status", "Death")
+
+lapply(columns_e, function(x){
+           dfr <- data.frame(table(pData(edset)[,x]))
+           colnames(dfr) <- c(x, "Freq")
+           kable(dfr)
+                })
+
+```
