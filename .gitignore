@@ -1,4 +1,7 @@
 *.Rds
+*.RData
+*.rdb
+*.rdx
 *.rds
 *.rda
 *.Rda
@@ -12,4 +15,5 @@
 *DS*
 *.db
 .vscode
-.swp
+*.swp
+*.swo

@@ -6,7 +6,7 @@ output:
 ---
 
 ```{r, echo = FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.align = 'center')
 ```
 
 ```{r}
@@ -21,13 +21,13 @@ source("/Volumes/igmm/sims-lab/Dominic/functions/idReplace.R")
 ```
 
 ```{r}
-edset <- read_rds("../../../edinburgh/output/dorm-v4.rds")
+edset <- read_rds("../../../../edinburgh/output/dorm-v4.rds")
 edset$timepoint <- ifelse(edset$time.point_3cat == 1, "diagnosis", 
                            ifelse(edset$time.point_3cat == 2, "on-treatment", "long-term"))
 edset$xpr_id <- edset$ID_D120days_3cat
 edset$patient_id <- edset$patient.no
 edset$is_dormant <- edset$dorm.group_v4 == "D"
-georgeset_base <- read_rds("../../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
+georgeset_base <- read_rds("../../../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
 georgeset <- georgeset_base[, !is.na(georgeset_base$timepoint)]
 
 eset_lst <- list(edset, georgeset)
