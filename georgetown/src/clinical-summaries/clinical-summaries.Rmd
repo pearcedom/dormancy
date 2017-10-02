@@ -41,7 +41,7 @@ columns_e <- c("dorm.group_v4", "time.point_3cat", "age", "T", "N", "M", "ER", "
 lapply(columns_e, function(x){
            dfr <- data.frame(table(pData(edset)[,x]))
            colnames(dfr) <- c(x, "Freq")
-           kable(dfr)
+           print(kable(dfr))
                 })
 
 ```
