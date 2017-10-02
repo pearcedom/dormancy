@@ -9,7 +9,7 @@ library(Biobase)
 ```
 
 Georgetown dormancy data summaries
-----------------------------------
+==================================
 
 ``` r
 georgeset <- read_rds("../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
@@ -164,7 +164,7 @@ for(x in columns_g){
 | TRUE            |    68|
 
 Edinburgh dormancy data summaries
----------------------------------
+=================================
 
 ``` r
 edset <- read_rds("../../edinburgh/output/dorm-v4.rds")
