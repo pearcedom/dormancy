@@ -94,4 +94,4 @@ preds_lst <- lapply(entrez_lst, function(eset_entrez){
 plot_grid(plotlist = preds_lst, ncol = 1)
 ```
 
-<img src="/Volumes/igmm/sims-lab/Dominic/labbook/dormancy/georgetown/doc/subtyping_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-5-1.png" style="display: block; margin: auto;" />
+<img src="subtyping_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-5-1.png" style="display: block; margin: auto;" />
