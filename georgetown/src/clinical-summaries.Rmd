@@ -22,11 +22,11 @@ georgeset <- read_rds("../output/final-georgeset-sep-frma-fselect-loess-clin-cb.
 
 columns_g <- c("is_dormant", "timepoint", "Age", "Surgery.Performed", "T", "N", "M", "ER", "Diagnostic.CB.Grade", "HER2.IHC", "HER2.FISH", "Overall.HER2", "No.of.Pos.Nodes", "Chemo", "Radiotherapy", "ET.Drugs", "Any.Recurrence", "Alive.Dead", "is_freshfrozen")
 
-lapply(columns_g, function(x){
+for(x in columns_g){
                    dfr <- data.frame(table(pData(georgeset)[,x]))
                    colnames(dfr) <- c(x, "Freq")
                    kable(dfr)
-                }) 
+                } 
 ```
 
 ## Edinburgh dormancy data summaries
@@ -34,14 +34,12 @@ lapply(columns_g, function(x){
 ```{r}
 edset <- read_rds("../../edinburgh/output/dorm-v4.rds")
 
-colnames(pData(edset))
-
 columns_e <- c("dorm.group_v4", "time.point_3cat", "age", "T", "N", "M", "ER", "Grade", "HER2", "HER2.FISH", "drug.type", "proteomics", "recur.status", "Death")
 
-obs <- lapply(columns_e, function(x){
+for(x in columns_e){
            dfr <- data.frame(table(pData(edset)[,x]))
            colnames(dfr) <- c(x, "Freq")
            print(kable(dfr))
-                })
+}
 
 ```
