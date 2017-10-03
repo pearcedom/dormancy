@@ -1,0 +1,257 @@
+Batch effects and correction
+================
+Dominic Pearce
+
+``` r
+library(tidyverse)
+library(Biobase)
+library(sva)
+library(reshape2)
+library(testthat)
+library(ggthemes)
+library(cowplot); theme_set(theme_gray())
+source("../../../../functions/mostVar.R")
+source("../../../../functions/library/mdsArrange.R")
+```
+
+#### We have our frma and loess normalised expression set, but there still clearly exists a big batch difference between FF and FFPE source material. This is evident in terms of the overall sample distributions
+
+``` r
+georgeset <- read_rds("../output/georgeset-sep-frma-fselect-loess-clin.Rds")
+```
+
+Visual determination
+--------------------
+
+### Pre-correction
+
+``` r
+batchEffectDists <- function(mtx_input){
+    #arrange
+    george_mlt <- melt(mtx_input)
+    george_mrg <- base::merge(george_mlt, pData(georgeset), by.x = "Var2", by.y = 0)
+    george_mrg$Var2 <- factor(george_mrg$Var2, levels = unique(george_mrg$Var2[order(george_mrg$is_freshfrozen)]))
+    #boxplot
+    p_box <- ggplot(george_mrg, aes(x = Var2, y = value, fill = is_freshfrozen)) + 
+        geom_boxplot() +
+        theme(legend.position = 'bottom',
+            axis.ticks.x = element_blank(),
+            axis.text.x = element_blank())
+    #densityplot
+    p_dist <- ggplot(george_mrg, aes(x = value, colour = is_freshfrozen, group = Var2), alpha = 0.05) + 
+        geom_line(stat = 'density', alpha = 0.2) + 
+        theme_pander() +    
+        theme(legend.position = 'bottom',
+            axis.ticks.x = element_blank(),
+            axis.text.x = element_blank()) 
+        #combine
+    plot_grid(p_box, p_dist, ncol = 1)
+}
+
+batchEffectDists(exprs(georgeset))
+```
+
+<img src="batch-correction_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-4-1.png" style="display: block; margin: auto;" />
+
+#### ...as well as when comparing just the 500 most variable genes as an mds
+
+``` r
+batchEffectMDS <- function(mtx_input, colour_by){
+    #arrange
+    mv500 <- mostVar(mtx_input, 500) %>% row.names()
+    arg500 <- mdsArrange(mtx_input[mv500,]) 
+    mds_input <- base::merge(arg500, pData(georgeset), by.x = 'ids', by.y = 0)
+    #and plot
+    ggplot(mds_input, aes_string("x", "y", colour = colour_by)) + 
+        geom_point() + 
+        theme_pander() + 
+        theme(legend.position = 'bottom')
+}
+
+batchEffectMDS(exprs(georgeset), "is_freshfrozen")
+```
+
+<img src="batch-correction_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-5-1.png" style="display: block; margin: auto;" />
+
+#### We can additionally check a number of other variables to check for any other effects
+
+``` r
+var_vec <- c("biopsy", "is_uss", "Age", "ER", "Diagnostic.CB.Grade", "No.of.Pos.Nodes")
+plot_lst <- lapply(var_vec, function(variable) batchEffectMDS(exprs(georgeset), variable))
+cowplot::plot_grid(plotlist = plot_lst, ncol = 3)
+```
+
+<img src="batch-correction_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-6-1.png" style="display: block; margin: auto;" />
+
+#### And as it's perhaps the most likely source of biological variation, we'll plot biopsy number a little larger
+
+``` r
+batchEffectMDS(exprs(georgeset), "timepoint")
+```
+
+<img src="batch-correction_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-7-1.png" style="display: block; margin: auto;" />
+
+### Correction and post-correction
+
+#### We'll attempt to correct for this source material-specific batch effect using ComBat
+
+``` r
+g_cb <- ComBat(exprs(georgeset), batch = as.numeric(georgeset$is_freshfrozen))
+```
+
+    ## Standardizing Data across genes
+
+#### And XPN
+
+*note, I've ignored XPN here as it was a bit hacky to get it working and I don't fully trust it*
+
+``` r
+#lapply(list.files("~/Desktop/temp-store/inSilicoMerging/R/"), function(file){
+#           print(file)
+#           source(file.path("~/Desktop/temp-store/inSilicoMerging/R", file))
+#            })
+#source("~/Desktop/temp-store/inSilicoMerging/R/xpn.R")
+#source("~/Desktop/temp-store/inSilicoMerging/R/util.R")
+#
+##g_xpn <- merge(list(georgeset[, georgeset$is_freshfrozen], georgeset[, !georgeset$is_freshfrozen]), method = "XPN")
+#aux <- xpn(georgeset[, georgeset$is_freshfrozen], georgeset[, !georgeset$is_freshfrozen])
+#g_xpn <- a4Base::combineTwoExpressionSet(aux[[1]], aux[[2]])
+##write_rds(aux, "~/Desktop/temp-store/gset-frma-feature-loess-xpn.rds")
+```
+
+ComBat
+
+``` r
+batchEffectDists(g_cb)
+```
+
+<img src="batch-correction_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-10-1.png" style="display: block; margin: auto;" />
+
+XPN
+
+``` r
+#batchEffectDists(exprs(g_xpn))
+```
+
+#### Better? What about by MDS?
+
+ComBat
+
+``` r
+batchEffectMDS(g_cb, "is_freshfrozen")
+```
+
+<img src="batch-correction_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-12-1.png" style="display: block; margin: auto;" />
+
+``` r
+batchEffectMDS(g_cb, "timepoint") 
+```
+
+<img src="batch-correction_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-12-2.png" style="display: block; margin: auto;" />
+
+XPN
+
+``` r
+#batchEffectMDS(exprs(g_xpn), "is_freshfrozen")
+```
+
+#### Prior to feature selecting, the FF vs FFPE effect was still very evident post-correction but now the clear divide caused by source material has seemingly all but been removed.
+
+#### Let's now check the FF-FFPE replicate samples only
+
+``` r
+material_rep_ids <- c("50-1", "50-2", "50-3", "50-4", "135-1", "135-4", "188-1", "268-1", "268-2", "298-1", "298-2", "347-3", "413-1", "413-2", "416-1", "416-2")
+material_rep_vec <- rep(FALSE, ncol(georgeset))
+material_rep_vec[which(georgeset$sample_id %in% material_rep_ids)] <- TRUE
+georgeset$is_material_rep <- material_rep_vec
+
+batchEffectDists(g_cb[, material_rep_vec])
+```
+
+<img src="batch-correction_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-14-1.png" style="display: block; margin: auto;" />
+
+``` r
+batchEffectMDS(g_cb[, material_rep_vec], "sample_id") + geom_point(aes(size = is_freshfrozen))
+```
+
+<img src="batch-correction_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-14-2.png" style="display: block; margin: auto;" />
+
+``` r
+#batchEffectDists(g_xpn[, material_rep_vec])
+#batchEffectMDS(g_xpn[, material_rep_vec], "is_freshfrozen")
+```
+
+#### And write out final .Rds to be used in the actual analysis
+
+``` r
+georgeset_cb <- georgeset
+exprs(georgeset_cb) <- g_cb
+
+#test we haven't broken our expressionset as can happen!
+test_that("eset overwrite worked as expected", {
+              expect_identical(g_cb, exprs(georgeset_cb))
+             expect_identical(pData(georgeset), pData(georgeset_cb))
+           })
+
+#write_rds(georgeset_cb, "../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
+```
+
+Statistical determination
+-------------------------
+
+We can losely define the batch-sepcific *inter*-patienty and *intra*-patient heterogeneity as biological variation, just as the replicate sample variation can be almost entirely attributed to technical variation or noise. Additionally, the overall variability will be explained by a combination of the above.
+
+Therefore, post-ComBat, if the 'biological' variation remains constant post-ComBat, whislt the technical variation is removed we can be confident that our correction has been effective but not to the degree of removing bioloical signal.
+
+``` r
+getSampleCors <- function(mtx){
+    cor_mtx <- cor(mtx)
+    diag(cor_mtx) <- NA
+    colMeans(cor_mtx, na.rm = TRUE)
+}
+
+input_lst <- list(raw_all = exprs(georgeset), 
+                  raw_ff = exprs(georgeset)[, georgeset$is_freshfrozen],
+                  raw_ffpe = exprs(georgeset)[, !georgeset$is_freshfrozen],
+                  raw_rep = exprs(georgeset)[, georgeset$is_material_rep],
+                  cb_all = exprs(georgeset_cb), 
+                  cb_ff = exprs(georgeset_cb)[, georgeset_cb$is_freshfrozen],
+                  cb_ffpe = exprs(georgeset_cb)[, !georgeset_cb$is_freshfrozen],
+                  cb_rep = exprs(georgeset_cb)[, georgeset_cb$is_material_rep]
+                  )
+
+cor_dfr <- lapply(names(input_lst), function(x){
+                      data.frame(cor = getSampleCors(input_lst[[x]]), comparison = x)
+                  }) %>% do.call(rbind, .)
+cor_dfr$correction <- factor(ifelse(grepl("raw", cor_dfr$comparison), "RAW", "CB"), 
+                             levels = c("RAW", "CB"))
+
+ggplot(cor_dfr, aes(x = comparison, cor)) + 
+    geom_boxplot(outlier.size = 0) + 
+    geom_jitter(width = 0.1, alpha = 0.7) +
+    facet_wrap(~correction, nrow = 1, scales = 'free_x') + 
+    labs(x = "Comparison Type", 
+         y = "Correlation", 
+         title = "Pre- and post-correction correlation") +
+    theme_pander() +
+    theme(panel.spacing = unit(5, "lines"))
+```
+
+<img src="batch-correction_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-16-1.png" style="display: block; margin: auto;" />
+
+Happily we can see that whilst our overall and replicate correlations have drastically improved, this has not been at the expense of our batch-specific correlations - i.e. biological variation has been preserved.
+
+``` r
+lapply(names(input_lst), function(x){
+           data.frame(Correlation = mean(cor_dfr[cor_dfr$comparison == x,]$cor), 
+                      Comparison = x) 
+         }) %>% 
+    do.call(rbind, .) %>%
+    t() %>% 
+    knitr::kable()
+```
+
+|             |           |           |           |           |           |           |           |           |
+|:------------|:----------|:----------|:----------|:----------|:----------|:----------|:----------|:----------|
+| Correlation | 0.8280978 | 0.9151191 | 0.8981515 | 0.8235500 | 0.9010825 | 0.9002291 | 0.9006958 | 0.9027842 |
+| Comparison  | raw\_all  | raw\_ff   | raw\_ffpe | raw\_rep  | cb\_all   | cb\_ff    | cb\_ffpe  | cb\_rep   |
