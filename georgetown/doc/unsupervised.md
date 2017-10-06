@@ -23,8 +23,10 @@ edset$patient_id <- edset$patient.no
 edset$is_dormant <- edset$dorm.group_v4 == "D"
 edset$timepoint <- ifelse(edset$time.point_3cat == 1, "diagnosis", 
                           ifelse(edset$time.point_3cat == 2, "on-treatment", "long-term"))
+edset$days_treated <- edset$days_newinfo
 
-georgeset_affy <- read_rds("../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
+georgeset_base <- read_rds("../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
+georgeset_affy <- georgeset_base[, !is.na(georgeset_base$is_dormant)]
 xpr_hgnc <- idReplace(exprs(georgeset_affy), 
                         id.in = "affy_hg_u133_plus_2", 
                         id.out = "hgnc_symbol")
@@ -42,7 +44,7 @@ eset_lst <- list(edset, georgeset)
 
 ``` r
 eset500_lst <- lapply(eset_lst, function(eset){
-                          eset_sub <- eset[, which(eset$timepoint != 'diagnosis')]
+                          eset_sub <- eset[, which(eset$timepoint == 'long-term')]
                           mv500 <- mostVar(exprs(eset_sub), 500) %>% row.names()
                           eset[mv500,]
 })
@@ -51,67 +53,68 @@ do.call(intersect, lapply(eset500_lst, row.names))
 ```
 
     ##   [1] "MUCL1"       "S100P"       "PIP"         "SCGB2A1"     "FOSB"       
-    ##   [6] "SCGB2A2"     "GRIA2"       "CLEC3A"      "HMGCS2"      "NPY1R"      
-    ##  [11] "FOS"         "CEACAM6"     "S100A7"      "TFF1"        "BMPR1B"     
-    ##  [16] "CD24"        "PROM1"       "CLCA2"       "UGT2B28"     "VTCN1"      
-    ##  [21] "HBB"         "FABP4"       "IGKV1D-17"   "LINC00993"   "SPP1"       
-    ##  [26] "SERPINA3"    "PIGR"        "SLITRK6"     "HBA1"        "HBA2"       
-    ##  [31] "THRSP"       "COL11A1"     "APOD"        "ACKR1"       "POTEB"      
-    ##  [36] "POTEB2"      "POTEB3"      "COMP"        "JCHAIN"      "MAOA"       
-    ##  [41] "KIF5C"       "CNTNAP2"     "S100A8"      "PPP1R1A"     "PTX3"       
-    ##  [46] "AGR2"        "CD24P4"      "MFAP4"       "CRYAB"       "CYP4Z1"     
-    ##  [51] "BAMBI"       "EGR3"        "CBLN2"       "UGT2B11"     "LRP2"       
-    ##  [56] "SLC39A6"     "UBD"         "CCL14"       "CCL15-CCL14" "COL10A1"    
-    ##  [61] "CA2"         "DUSP1"       "OLR1"        "GPAM"        "PLEKHS1"    
-    ##  [66] "ENPP5"       "EGR1"        "PLIN1"       "CXCL9"       "PDK4"       
-    ##  [71] "MAOB"        "PEG10"       "COL14A1"     "FHL1"        "ASPN"       
-    ##  [76] "PKIB"        "CDH1"        "CILP"        "TOP2A"       "CYR61"      
-    ##  [81] "IL33"        "KRT5"        "C8orf4"      "MATN3"       "C7"         
-    ##  [86] "SHISA2"      "ZFP36"       "NR2F1"       "HOXC9"       "MUC1"       
-    ##  [91] "TFAP2B"      "SYT13"       "SCNN1A"      "G0S2"        "SCUBE2"     
-    ##  [96] "CCDC80"      "TF"          "TACSTD2"     "MRPS30"      "CD36"       
-    ## [101] "LYPD6B"      "TBC1D9"      "NDNF"        "GLDN"        "PTN"        
-    ## [106] "GHR"         "COL5A2"      "DHRS2"       "NTNG1"       "CHI3L1"     
-    ## [111] "MB"          "UNC5A"       "SLC26A3"     "BEX2"        "SFRP1"      
-    ## [116] "AGR3"        "GABRP"       "CAVIN2"      "LPL"         "NTN4"       
-    ## [121] "SYCP2"       "IRX2"        "MKX"         "GATA3"       "MAL2"       
-    ## [126] "GP2"         "TM4SF18"     "PRLR"        "CLSTN2"      "GRP"        
-    ## [131] "AKR1C3"      "MGP"         "FNDC1"       "CEP55"       "CDR1"       
-    ## [136] "MEOX1"       "EPCAM"       "CARTPT"      "CLDN8"       "STC2"       
-    ## [141] "ANXA3"       "ADAMTS1"     "NAT1"        "TIMP4"       "SOCS2"      
-    ## [146] "GREM1"       "MMP13"       "GAS1"        "RGS1"        "CCL2"       
-    ## [151] "LIFR"        "HMCN1"       "MLPH"        "KCNJ3"       "C15orf48"   
-    ## [156] "MIR147B"     "OGN"         "GJB2"        "POSTN"       "CD300LG"    
-    ## [161] "IER3"        "AOX1"        "GZMK"        "CXCL10"      "AGTR1"      
-    ## [166] "OPRPN"       "ALDH3B2"     "CEACAM5"     "AURKA"       "HOTAIR"     
-    ## [171] "STC1"        "MMP3"        "ANXA1"       "GEM"         "CYP4F8"     
-    ## [176] "FOXA1"       "SPARCL1"     "HLA-DQA2"    "RGS5"        "SYNM"       
-    ## [181] "IFI44L"      "WISP2"       "SCUBE3"      "C1QB"        "CPA3"       
-    ## [186] "SFRP2"       "NDP"         "HLA-DQA1"    "PCSK1"       "MFAP5"
+    ##   [6] "CEACAM6"     "CLEC3A"      "TFF1"        "GRIA2"       "CD24"       
+    ##  [11] "CLCA2"       "SERPINA3"    "KRT14"       "SCGB2A2"     "PROM1"      
+    ##  [16] "BMPR1B"      "SPP1"        "IGKV1D-17"   "FOS"         "UGT2B28"    
+    ##  [21] "FABP4"       "PTX3"        "LINC00993"   "PIGR"        "COL11A1"    
+    ##  [26] "THRSP"       "NPY1R"       "HBB"         "SLITRK6"     "VTCN1"      
+    ##  [31] "HBA1"        "HBA2"        "PPP1R1A"     "AGR2"        "COMP"       
+    ##  [36] "ACKR1"       "POTEB"       "POTEB2"      "POTEB3"      "OLR1"       
+    ##  [41] "MAOA"        "CFD"         "JCHAIN"      "CYP4Z1"      "CD177"      
+    ##  [46] "KRT5"        "CD24P4"      "CRYAB"       "PLIN1"       "S100A8"     
+    ##  [51] "LRP2"        "GPAM"        "COL10A1"     "ELN"         "CCL14"      
+    ##  [56] "CCL15-CCL14" "PDK4"        "COL14A1"     "PLEKHS1"     "CXCL9"      
+    ##  [61] "TOP2A"       "RERGL"       "NR2F1"       "PKIB"        "PCOLCE2"    
+    ##  [66] "HOXC9"       "FHL1"        "MFAP4"       "SYT13"       "ENPP5"      
+    ##  [71] "IL33"        "G0S2"        "UGT2B11"     "FAM3B"       "PEG10"      
+    ##  [76] "CA2"         "CILP"        "GABRP"       "SERPINE1"    "C7"         
+    ##  [81] "SAA1"        "MB"          "MUC1"        "SCNN1A"      "CD36"       
+    ##  [86] "C8orf4"      "EGR3"        "TACSTD2"     "LPL"         "CARTPT"     
+    ##  [91] "DUSP1"       "LRRN1"       "CXADR"       "ZFP36"       "GLDN"       
+    ##  [96] "CEP55"       "SFRP1"       "FNDC1"       "CLDN8"       "TFAP2B"     
+    ## [101] "CAVIN2"      "CCDC80"      "PTN"         "EPCAM"       "CYR61"      
+    ## [106] "BEX2"        "ADAMTS1"     "SLC26A3"     "AURKA"       "MLPH"       
+    ## [111] "TF"          "MAL2"        "SYCP2"       "GHR"         "TIMP4"      
+    ## [116] "CXCL2"       "CBLN2"       "SYNM"        "CD300LG"     "AGR3"       
+    ## [121] "OPRPN"       "MEOX1"       "GATA3"       "UNC5A"       "GP2"        
+    ## [126] "AZGP1"       "KCNJ3"       "PRLR"        "LIFR"        "SCUBE2"     
+    ## [131] "STC1"        "NDNF"        "HSPB8"       "FOXA1"       "GRP"        
+    ## [136] "CHI3L1"      "PLA2G2A"     "MRPS30"      "DHRS2"       "AKR1C3"     
+    ## [141] "CCL28"       "MMP13"       "HLA-DQA2"    "HMCN1"       "CYP4F8"     
+    ## [146] "TBC1D9"      "PCSK1"       "SHISA2"      "LYPD6B"      "ANXA3"      
+    ## [151] "NAT1"        "C15orf48"    "MIR147B"     "SEMA3G"      "CCL2"       
+    ## [156] "MMP3"        "EGR1"        "PCK1"        "GEM"         "MGP"        
+    ## [161] "MEST"        "AOX1"        "MKX"         "GJB2"        "CCL8"       
+    ## [166] "HLA-DQA1"    "TM4SF18"     "RASEF"       "POU2AF1"     "OLFM4"      
+    ## [171] "MFAP5"       "CYP2B7P"     "ALDH3B2"     "STC2"        "INHBA"      
+    ## [176] "GAS1"        "TC2N"        "AGTR1"       "C1QB"        "ANXA1"      
+    ## [181] "CIDEC"       "CEACAM5"     "NDP"
 
 #### as well as how well the are able to cluster patients based on dormancy status
 
 ``` r
 plotMDS <- function(eset, time_point = "all", title = ""){
-           if(time_point != "all"){
-               eset_in = eset[, which(eset$timepoint == time_point)]
+    if(time_point[[1]] != "all"){
+               eset_in = eset[, which(eset$timepoint %in% time_point)]
            } else {
                eset_in = eset 
            }
            arng_dfr <- mdsArrange(exprs(eset_in))
            mrg_dfr <- merge(arng_dfr, pData(eset_in), by.x = 'ids', by.y = 'xpr_id')
-           p_mds <- ggplot(mrg_dfr, aes(x = x, y = y, colour = is_dormant)) + 
+
+           p_mds <- ggplot(mrg_dfr, aes(x = x, y = y, colour = is_dormant, size = days_treated)) + 
                geom_point() + 
                labs(title = title,
                     subtitle = paste0("x separation p = ", 
                                       wilcox.test(x~is_dormant, data = mrg_dfr)$p.value)) +
                theme_pander() +
-               theme(legend.position = 'none')
+               theme(legend.position = 'top')
+
            p_box <- ggplot(mrg_dfr, aes(x = is_dormant, y = x, fill = is_dormant)) + 
                geom_boxplot(notch = TRUE) + 
                coord_flip() + 
                theme_pander() + 
-               theme(legend.position = 'bottom')
+               theme(legend.position = 'none')
            plot_grid(p_mds, p_box, rel_heights = c(3, 1), ncol = 1)
 }
 ```
@@ -123,7 +126,16 @@ lapply(eset500_lst, function(x) plotMDS(x, 'all', 'All Samples')) %>%
     plot_grid(plotlist = ., labels = c("Edinburgh", "Georgetown"), scale = 0.9)
 ```
 
-<img src="unsupervised_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-6-1.png" style="display: block; margin: auto;" />
+<img src="unsupervised_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-7-1.png" style="display: block; margin: auto;" />
+
+### Treated samples
+
+``` r
+lapply(eset500_lst, function(x) plotMDS(x, c('on-treatment', 'long-term'), 'Treated Samples')) %>% 
+    plot_grid(plotlist = ., labels = c("Edinburgh", "Georgetown"), scale = 0.9)
+```
+
+<img src="unsupervised_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-8-1.png" style="display: block; margin: auto;" />
 
 ### Long-term samples
 
@@ -132,7 +144,7 @@ lapply(eset500_lst, function(x) plotMDS(x, 'long-term', 'Long-term Samples')) %>
     plot_grid(plotlist = ., labels = c("Edinburgh", "Georgetown"), scale = 0.9)
 ```
 
-<img src="unsupervised_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-7-1.png" style="display: block; margin: auto;" />
+<img src="unsupervised_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-9-1.png" style="display: block; margin: auto;" />
 
 ### On-treatment samples
 
@@ -141,7 +153,7 @@ lapply(eset500_lst, function(x) plotMDS(x, 'on-treatment', 'On-treatment Samples
     plot_grid(plotlist = ., labels = c("Edinburgh", "Georgetown"), scale = 0.9)
 ```
 
-<img src="unsupervised_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-8-1.png" style="display: block; margin: auto;" />
+<img src="unsupervised_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-10-1.png" style="display: block; margin: auto;" />
 
 ### Diagnostic samples
 
@@ -150,4 +162,4 @@ lapply(eset500_lst, function(x) plotMDS(x, 'diagnosis', 'Diagnostic Samples')) %
     plot_grid(plotlist = ., labels = c("Edinburgh", "Georgetown"), scale = 0.9)
 ```
 
-<img src="unsupervised_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-9-1.png" style="display: block; margin: auto;" />
+<img src="unsupervised_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-11-1.png" style="display: block; margin: auto;" />

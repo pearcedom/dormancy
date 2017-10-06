@@ -28,7 +28,7 @@ edset$xpr_id <- edset$ID_D120days_3cat
 edset$patient_id <- edset$patient.no
 edset$is_dormant <- edset$dorm.group_v4 == "D"
 georgeset_base <- read_rds("../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
-georgeset <- georgeset_base[, !is.na(georgeset_base$timepoint)]
+georgeset <- georgeset_base[, !is.na(georgeset_base$timepoint) & !is.na(georgeset_base$is_dormant)]
 
 eset_lst <- list(edset, georgeset)
 ```

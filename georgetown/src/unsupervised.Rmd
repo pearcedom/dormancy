@@ -31,8 +31,10 @@ edset$patient_id <- edset$patient.no
 edset$is_dormant <- edset$dorm.group_v4 == "D"
 edset$timepoint <- ifelse(edset$time.point_3cat == 1, "diagnosis", 
                           ifelse(edset$time.point_3cat == 2, "on-treatment", "long-term"))
+edset$days_treated <- edset$days_newinfo
 
-georgeset_affy <- read_rds("../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
+georgeset_base <- read_rds("../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
+georgeset_affy <- georgeset_base[, !is.na(georgeset_base$is_dormant)]
 xpr_hgnc <- idReplace(exprs(georgeset_affy), 
                         id.in = "affy_hg_u133_plus_2", 
                         id.out = "hgnc_symbol")
@@ -50,7 +52,7 @@ eset_lst <- list(edset, georgeset)
 
 ```{r}
 eset500_lst <- lapply(eset_lst, function(eset){
-                          eset_sub <- eset[, which(eset$timepoint != 'diagnosis')]
+                          eset_sub <- eset[, which(eset$timepoint == 'long-term')]
                           mv500 <- mostVar(exprs(eset_sub), 500) %>% row.names()
                           eset[mv500,]
 })
@@ -62,33 +64,60 @@ do.call(intersect, lapply(eset500_lst, row.names))
 
 ```{r}
 plotMDS <- function(eset, time_point = "all", title = ""){
-           if(time_point != "all"){
-               eset_in = eset[, which(eset$timepoint == time_point)]
+    if(time_point[[1]] != "all"){
+               eset_in = eset[, which(eset$timepoint %in% time_point)]
            } else {
                eset_in = eset 
            }
            arng_dfr <- mdsArrange(exprs(eset_in))
            mrg_dfr <- merge(arng_dfr, pData(eset_in), by.x = 'ids', by.y = 'xpr_id')
-           p_mds <- ggplot(mrg_dfr, aes(x = x, y = y, colour = is_dormant)) + 
+
+           p_mds <- ggplot(mrg_dfr, aes(x = x, y = y, colour = is_dormant, size = days_treated)) + 
                geom_point() + 
                labs(title = title,
                     subtitle = paste0("x separation p = ", 
                                       wilcox.test(x~is_dormant, data = mrg_dfr)$p.value)) +
                theme_pander() +
-               theme(legend.position = 'none')
+               theme(legend.position = 'top')
+
            p_box <- ggplot(mrg_dfr, aes(x = is_dormant, y = x, fill = is_dormant)) + 
                geom_boxplot(notch = TRUE) + 
                coord_flip() + 
                theme_pander() + 
-               theme(legend.position = 'bottom')
+               theme(legend.position = 'none')
            plot_grid(p_mds, p_box, rel_heights = c(3, 1), ncol = 1)
 }
 ```
 
 ### All samples
 
+```{r, echo = FALSE, eval = FALSE}
+#scree plotting and PCA vs MDS comparison
+#d <- exprs(eset500_lst[[1]])
+#dst <- dist(t(scale(d)))
+#dN <- dimnames(d)[[2]]
+#dst.m <- as.matrix(dst)
+#dimnames(dst.m) <- list(dN, dN)
+#dst.cmd <- cmdscale(dst.m, k = 2, eig = TRUE)
+#
+#eig_dfr <- data.frame(eig = dst.cmd$eig / sum(dst.cmd$eig) * 100, pc = 1:length(dst.cmd$eig))
+#
+ggplot(dst.cmd, aes(x = pc, y = eig)) + geom_point()
+
+library(ggfortify)
+plot(prcomp(t(d)))
+dst.cmd <- cmdscale(dst.m, k = 2) %>% as.matrix() %>% data.frame()
+ggplot(dst.cmd, aes(X1, X2)) + geom_point()
+
 ```{r}
 lapply(eset500_lst, function(x) plotMDS(x, 'all', 'All Samples')) %>% 
+    plot_grid(plotlist = ., labels = c("Edinburgh", "Georgetown"), scale = 0.9)
+```
+
+### Treated samples
+
+```{r}
+lapply(eset500_lst, function(x) plotMDS(x, c('on-treatment', 'long-term'), 'Treated Samples')) %>% 
     plot_grid(plotlist = ., labels = c("Edinburgh", "Georgetown"), scale = 0.9)
 ```
 
