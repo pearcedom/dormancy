@@ -35,7 +35,7 @@ eset_lst <- list(edset, georgeset)
 
 ## Convert to entrezgene ids (genefu requires this) and package as a new eset
 
-```{r}
+```{r, cache = TRUE}
 id_vec <- c("hgnc_symbol", "affy_hg_u133_plus_2")
 entrez_lst <- lapply(1:2, function(x){
                          xpr_entrez <- idReplace(exprs(eset_lst[[x]]), 
@@ -52,7 +52,7 @@ entrez_lst <- lapply(1:2, function(x){
 
 ## Calculate subtypes
 
-```{r}
+```{r, fig.height = 3}
 
 preds_lst <- lapply(entrez_lst, function(eset_entrez){
     ano_dfr <- data.frame(probe = row.names(eset_entrez), 

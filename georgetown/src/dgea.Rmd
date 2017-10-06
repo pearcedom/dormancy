@@ -1,0 +1,28 @@
+---
+title: Differential gene expression analysis 
+author: Dominic Pearce
+output:
+    github_document
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
+```
+
+
+```{r}
+library(tidyverse)
+library(Biobase)
+```
+
+
+```{r}
+georgeset <- read_rds("../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
+
+lt_sub <- georgeset[, which(!is.na(georgeset$is_dormant) & georgeset$timepoint == 'long-term')]
+lt_xpr <- data.frame(exprs(lt_sub))
+
+#RankProd package apparently no longer works so I need to use an external program here
+#write_tsv(lt_xpr, "../output/long-term-xpr.tsv")
+
+```
