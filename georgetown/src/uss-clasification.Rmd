@@ -100,18 +100,33 @@ probeset_dfr$affy_hg_u133a[probeset_dfr$affy_hg_u133a == ""] <- NA
 probeset_all <- as.character(na.omit(probeset_dfr$affy_hg_u133a))
 probeset_available <- row.names(georgeset)[which(row.names(georgeset) %in% probeset_all)]
 
-xpr <- exprs(georgeset[probeset_available, xprdorm_ind])
+xpr <- data.frame(value = colSums(exprs(georgeset[probeset_available, xprdorm_ind])))
 
-xpr_mlt <- melt(xpr)
-xpr_mrg <- merge(xpr_mlt, pData(georgeset), by.x = 'Var2', by.y = 0)
+xpr_mrg <- merge(xpr, pData(georgeset), by = 0)
 xpr_mrg$timepoint <- factor(xpr_mrg$timepoint, levels = c("diagnosis", "on-treatment", "long-term"))
 
 ggplot(xpr_mrg, aes(x = days_treated, y = value, colour = is_dormant, group = patient_id)) + 
     geom_line() +
-    facet_wrap(is_dormant~Var1, scales = 'free', ncol = 5) + 
+    facet_wrap(~is_dormant, scales = 'free', ncol = 5) + 
 #    theme_pander() + 
     theme(legend.position = 'bottom') + 
     ggtitle("Unfinished")
 
+ggplot(xpr_mrg, aes(x = timepoint, y = value, colour = is_dormant, group = patient_id)) + 
+    geom_line() +
+    facet_wrap(~is_dormant, scales = 'free', ncol = 5) + 
+#    theme_pander() + 
+    theme(legend.position = 'bottom') + 
+    ggtitle("Unfinished")
+```
+
+
+```{r, fig.height = 20}
+ggplot(xpr_mrg, aes(x = days_treated, y = value, colour = is_dormant, group = patient_id)) + 
+    geom_line() +
+    facet_wrap(~patient_id, scales = 'free', ncol = 5) + 
+#    theme_pander() + 
+    theme(legend.position = 'bottom') + 
+    ggtitle("Unfinished")
 ```
 

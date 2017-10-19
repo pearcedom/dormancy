@@ -5,10 +5,12 @@
 
 print("functions are batchEffectDists() & batchEffectMDS()")
 
+library(ggthemes)
+library(Biobase)
+source("../../../../functions/mostVar.R")
+source("../../../../functions/library/mdsArrange.R")
+
 batchEffectDists <- function(eset, batch_col){
-    library(Biobase)
-    source("../../../../functions/mostVar.R")
-    source("../../../../functions/library/mdsArrange.R")
     mtx_input <- exprs(eset)
     pheno <- pData(eset)
 
@@ -35,10 +37,6 @@ batchEffectDists <- function(eset, batch_col){
 
 
 batchEffectMDS <- function(eset, batch_col){
-    library(Biobase)
-    library(ggthemes)
-    source("../../../../functions/mostVar.R")
-    source("../../../../functions/library/mdsArrange.R")
     mtx_input <- exprs(eset)
     pheno <- pData(eset)
     #arrange
