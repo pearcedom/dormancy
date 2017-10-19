@@ -121,7 +121,7 @@ ggplot(xpr_mrg, aes(x = timepoint, y = value, colour = is_dormant, group = patie
 ```
 
 
-```{r, fig.height = 20}
+```{r, fig.height = 14}
 ggplot(xpr_mrg, aes(x = days_treated, y = value, colour = is_dormant, group = patient_id)) + 
     geom_line() +
     facet_wrap(~patient_id, scales = 'free', ncol = 5) + 
