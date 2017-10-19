@@ -9,6 +9,8 @@ output:
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center', fig.width = 8, fig.height = 6)
 ```
 
+#### *NOTE: these normalisation and batch correction files have been run recursively, i.e. once with all samples to determine which duplicates to remove, then with duplicates removed, then with `is_dormant == NA` samples removed. They will therefore only detail the final run-through though all the code from raw to final expressionsets remains, only the input files need to be changed.*
+
 ```{r}
 library(tidyverse)
 library(Biobase)
@@ -33,6 +35,8 @@ georgeset <- read_rds("../output/georgeset-sep-frma-fselect-loess-clin.Rds")
 
 ```{r}
 batchEffectDists <- function(mtx_input){
+source("../../../../functions/mostVar.R")
+source("../../../../functions/library/mdsArrange.R")
     #arrange
     george_mlt <- melt(mtx_input)
     george_mrg <- base::merge(george_mlt, pData(georgeset), by.x = "Var2", by.y = 0)
@@ -121,12 +125,6 @@ ComBat
 batchEffectDists(g_cb)
 ```
 
-XPN
-
-```{r}
-#batchEffectDists(exprs(g_xpn))
-```
-
 #### Better? What about by MDS?
 
 ComBat
@@ -136,30 +134,7 @@ batchEffectMDS(g_cb, "is_freshfrozen")
 batchEffectMDS(g_cb, "timepoint") 
 ```
 
-XPN
-
-```{r}
-#batchEffectMDS(exprs(g_xpn), "is_freshfrozen")
-```
-
-#### Prior to feature selecting, the FF vs FFPE effect was still very evident post-correction but now the clear divide caused by source material has seemingly all but been removed.
-
-#### Let's now check the FF-FFPE replicate samples only
-
-```{r}
-material_rep_ids <- c("50-1", "50-2", "50-3", "50-4", "135-1", "135-4", "188-1", "268-1", "268-2", "298-1", "298-2", "347-3", "413-1", "413-2", "416-1", "416-2")
-material_rep_vec <- rep(FALSE, ncol(georgeset))
-material_rep_vec[which(georgeset$sample_id %in% material_rep_ids)] <- TRUE
-georgeset$is_material_rep <- material_rep_vec
-
-batchEffectDists(g_cb[, material_rep_vec])
-batchEffectMDS(g_cb[, material_rep_vec], "sample_id") + geom_point(aes(size = is_freshfrozen))
-
-#batchEffectDists(g_xpn[, material_rep_vec])
-#batchEffectMDS(g_xpn[, material_rep_vec], "is_freshfrozen")
-```
-
-#### And write out final .Rds to be used in the actual analysis
+#### Prior to feature selecting, the FF vs FFPE effect was still very evident post-correction but now the clear divide caused by source material has seemingly all but been removed. Therefore, we'll write out the final expression set to be used in the actual analysis
 
 ```{r}
 georgeset_cb <- georgeset
@@ -171,8 +146,18 @@ test_that("eset overwrite worked as expected", {
              expect_identical(pData(georgeset), pData(georgeset_cb))
            })
 
-#write_rds(georgeset_cb, "../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
+write_rds(georgeset_cb, "../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
 ```
+
+### *The following is now redundent as duplilcate samples have been determined and removed previously*
+
+#### Let's now check the FF-FFPE replicate samples only 
+
+```{r, eval = FALSE}
+batchEffectDists(g_cb[, georgeset$is_material_rep])
+batchEffectMDS(g_cb[, georgeset$is_material_rep], "sample_id") + geom_point(aes(size = is_freshfrozen))
+```
+
 
 ## Statistical determination 
 
@@ -180,7 +165,7 @@ We can losely define the batch-sepcific *inter*-patienty and *intra*-patient het
 
 Therefore, post-ComBat, if the 'biological' variation remains constant post-ComBat, whislt the technical variation is removed we can be confident that our correction has been effective but not to the degree of removing bioloical signal.
 
-```{r}
+```{r, eval = FALSE}
 getSampleCors <- function(mtx){
     cor_mtx <- cor(mtx)
     diag(cor_mtx) <- NA
@@ -198,7 +183,9 @@ input_lst <- list(raw_all = exprs(georgeset),
                   )
 
 cor_dfr <- lapply(names(input_lst), function(x){
-                      data.frame(cor = getSampleCors(input_lst[[x]]), comparison = x)
+                      data.frame(cor = getSampleCors(input_lst[[x]]), 
+                                 comparison = x, 
+                                 xpr_id = colnames(input_lst[[x]]))
                   }) %>% do.call(rbind, .)
 cor_dfr$correction <- factor(ifelse(grepl("raw", cor_dfr$comparison), "RAW", "CB"), 
                              levels = c("RAW", "CB"))
@@ -216,7 +203,7 @@ ggplot(cor_dfr, aes(x = comparison, cor)) +
 
 Happily we can see that whilst our overall and replicate correlations have drastically improved, this has not been at the expense of our batch-specific correlations - i.e. biological variation has been preserved.
 
-```{r}
+```{r, eval = FALSE}
 lapply(names(input_lst), function(x){
            data.frame(Correlation = mean(cor_dfr[cor_dfr$comparison == x,]$cor), 
                       Comparison = x) 
@@ -226,5 +213,34 @@ lapply(names(input_lst), function(x){
     knitr::kable()
 ```
 
+## Duplicate samples selection and removal
+
+Finally, we can use our correlations to determine which samples to remove and which to keep. Our decision here will be made as two parts: 1. if the sample is FF, keep else 2. keep the FFPE replicate with the highest pre-correction intra-batch correlation
+
+```{r, eval = FALSE}
+ffpecor_dfr <- cor_dfr[which(cor_dfr$comparison %in% c("raw_ffpe")),]
+decision_dfr <- merge(ffpecor_dfr, pData(georgeset), by = "xpr_id")
+
+materialreps_toremove <- decision_dfr[decision_dfr$is_material_rep & !decision_dfr$is_freshfrozen,
+                                      "xpr_id"] %>% as.character()
+
+ffpedecision_dfr <- decision_dfr[decision_dfr$is_replicate, ]
+ffpe_rep_patients <- unique(ffpedecision_dfr$sample_id)
+
+
+technicalreps_toremove <- lapply(ffpe_rep_patients, function(sample){
+           dfr <- ffpedecision_dfr[which(ffpedecision_dfr$sample_id == sample),]
+           dfr$xpr_id[-which.max(dfr$cor)] %>% as.character
+         }) %>% unlist()
+```
+
+With these replicates to remove we physically do this in the intitial .CEL file directory, before AffyBatch creation
+
+```{r, eval = FALSE}
+c(technicalreps_toremove, materialreps_toremove) %>%
+    unique() %>% 
+    sort() %>% 
+    cat(sep = "\n")
+```
 
 

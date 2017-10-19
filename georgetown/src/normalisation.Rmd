@@ -10,6 +10,8 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align =
                       eval = FALSE)
 ```
 
+#### *NOTE: these normalisation and batch correction files have been run recursively, i.e. once with all samples to determine which duplicates to remove, then with duplicates removed, then with `is_dormant == NA` samples removed. They will therefore only detail the final run-through though all the code from raw to final expressionsets remains, only the input files need to be changed.*
+
 ```{r, eval = TRUE}
 library(affy)
 library(tidyverse)
@@ -31,7 +33,7 @@ dir_vec <- c("../data/Edinburgh\ Second\ Batch\ 170\ Samples/ff",
 affybatch_lst <- lapply(dir_vec, function(dir){
                             setwd(dir)
                             affybatch <- ReadAffy()
-                            setwd("../../src")
+                            setwd("../../../src")
                             affybatch
              })
 ```
@@ -74,9 +76,6 @@ frma_lst <- lapply(affybatch_lst, function(batch){
                        batch_frma <- frma(batch, input.vecs = hgu133plus2frmavecs)  
                        batch_frma[present_common, ]
            })
-#georgeset <- do.call(Biobase::combine, frma_lst)
-#write_rds(georgeset, "~/Desktop/temp-store/georgeset-sep-frma-fselect.rds")
-
 
 norm_lst <- lapply(frma_lst, function(batch){
                        mtx <- normalize.loess(exprs(batch))
@@ -84,5 +83,5 @@ norm_lst <- lapply(frma_lst, function(batch){
                        batch
            })
 georgeset <- do.call(Biobase::combine, norm_lst)
-#write_rds(georgeset, "~/Desktop/temp-store/georgeset-sep-frma-fselect-loess.rds")
+#write_rds(georgeset, "../output/georgeset-sep-frma-fselect-loess.rds")
 ```

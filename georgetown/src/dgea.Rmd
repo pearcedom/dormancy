@@ -13,6 +13,8 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align =
 ```{r}
 library(tidyverse)
 library(Biobase)
+library(ReactomePA)
+source("/Volumes/igmm/sims-lab/Dominic/functions/convert-id-to-gene-symbol-with-biomart.R")
 ```
 
 
@@ -21,8 +23,26 @@ georgeset <- read_rds("../output/final-georgeset-sep-frma-fselect-loess-clin-cb.
 
 lt_sub <- georgeset[, which(!is.na(georgeset$is_dormant) & georgeset$timepoint == 'long-term')]
 lt_xpr <- data.frame(exprs(lt_sub))
+colnames(lt_xpr) <- paste0(lt_sub$is_dormant, "-", colnames(lt_sub))
 
 #RankProd package apparently no longer works so I need to use an external program here
-#write_tsv(lt_xpr, "../output/long-term-xpr.tsv")
+#write.table(lt_xpr, "../output/long-term-xpr.tsv", sep = "\t")
+```
+
+
+```{r}
+lt_affy <- read.delim("../output/long-term-rp-genes.txt", header = FALSE)
+
+lt_ens <- id2GeneSymbolBM(lt_affy$V1, filters = "affy_hg_u133_plus_2", attributes = "entrezgene")
+
+lt_pwa <- enrichPathway(gene = na.omit(lt_ens$entrezgene), readable = TRUE)
+
+dotplot(lt_pwa, showCategory = 20)
+
+#write.csv(data.frame(lt_pwa), "../output/long-term-enrichment.csv")
+
+## THIS IS UNRELATED BUT SHOULD BE PUT SOMEWHERE ELSE
+georgeset[, which(georgeset$is_dormant & georgeset$timepoint == 'long-term')]$days_treated %>% summary()
+georgeset[, which(!georgeset$is_dormant & georgeset$timepoint == 'long-term')]$days_treated %>% summary()
 
 ```

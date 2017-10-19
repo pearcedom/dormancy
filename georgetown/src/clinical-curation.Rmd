@@ -9,6 +9,8 @@ output:
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
 ```
 
+#### *NOTE: these normalisation and batch correction files have been run recursively, i.e. once with all samples to determine which duplicates to remove, then with duplicates removed, then with `is_dormant == NA` samples removed. They will therefore only detail the final run-through though all the code from raw to final expressionsets remains, only the input files need to be changed.*
+
 ```{r}
 library(tidyverse)
 library(Biobase)
@@ -84,7 +86,7 @@ status_dfr <- lapply(unique(uss_dfr$patient_id), function(patient){
                           int_dfr <- uss_dfr[uss_dfr$is_uss & uss_dfr$patient_id == patient,]
                           ord_dfr <- int_dfr[order(int_dfr$days_treated),]
                           #get pre-90 day subset
-                          pre3 <- ord_dfr[ord_dfr$days_treated <= 90, ]
+                          pre3 <- ord_dfr[ord_dfr$days_treated <= 120, ]
 
                           #if there is a pre-90 day volume decrease by at least 40% & any 
                           #subsequent increase, relative to the lowest pre-90 measurement, 
@@ -115,12 +117,16 @@ Not too many changes to make here, only patient 283 in `clin_dfr` is called 283R
 we'll remove the Rs before merging both in `patient_id` and `sample_id` columns.
 
 ```{r}
+uss_dfr$patient_id <- as.character(uss_dfr$patient_id) #factors...
 uss_dfr$patient_id[grepl("R", uss_dfr$patient_id)] <- "283"
 uss_dfr$sample_id <- lapply(as.character(uss_dfr$sample_id), function(x){
                                 ifelse(grepl("R", x), gsub("R", "", x), x)
                         }) %>% unlist()
 
 ussclin_dfr <- merge(uss_dfr, clin_dfr, by.x = 'patient_id', by.y = 'LA.Number', all = TRUE)
+
+unique(ussclin_dfr$patient_id[ussclin_dfr$is_dormant]) %>% length()
+unique(ussclin_dfr$patient_id[!ussclin_dfr$is_dormant]) %>% length()
 
 #write.csv(ussclin_dfr, "../output/uss-clin.csv")
 ```
@@ -131,7 +137,7 @@ Lastly we can add to our pheno data by parsing information from the sample names
 expression and pheno data as a complete expression set
 
 ```{r}
-georgeset <- read_rds("~/Desktop/temp-store/georgeset-sep-frma-fselect-loess.rds")
+georgeset <- read_rds("../output/georgeset-sep-frma-fselect-loess.rds")
 ```
 
 This requires some complicated and careful calls : double-check, double-check, double-check
@@ -145,37 +151,36 @@ georgeset$is.control <- grepl("VHRR", colnames(georgeset), ignore.case = TRUE)
 #not a number
 tmp_id1 <- substring(colnames(georgeset), 1, 3) 
 georgeset$patient <- gsub("\\W", "", tmp_id1)
+#there is patient 400 and 400c, these are different patients and we'll need to add the c back
+georgeset$patient[grepl("400c", colnames(georgeset))] <- "400c"
+
 
 #remove everything to the first `-` and then take the next character
 tmp1 <- gsub("\\d+\\w-", "", colnames(georgeset), ignore.case = TRUE)
-tmp2 <- substring(tmp1, 1, 1)
-georgeset$biopsy <- tmp2
+georgeset$biopsy <- substring(tmp1, 1, 1)
+#fix for V from VHRR
 georgeset$biopsy[georgeset$biopsy == "V"] <- NA
 
+#the sample id is then simply the combination of patient and biopsy ids
 georgeset$sample_id <- paste(georgeset$patient, georgeset$biopsy, sep = '-')
 georgeset$sample <- NULL
 
+#keep a record of the original experimental processing ids
 georgeset$xpr_id <- colnames(georgeset)
 
-georgeset$platform <- "HG-U133_Plus_2"
+#for the georgetown data the platform is the same for all samples
+georgeset$platform <- "affy_hg_u133_plus_2"
 
-#this needs work
-georgeset$is.replicate <- ifelse(grepl("-([0-9])-([0-9])([a-z])_", colnames(georgeset),
-                                       ignore.case = TRUE), 
-                                   TRUE, 
-                                   FALSE)
-
-#this is capturing way too many samples it looks like
-pData(georgeset) <- lapply(unique(georgeset$patient), function(x){
-           subset_dfr <- pData(georgeset)[which(georgeset$patient == x),]
-           ff_tbl <- subset_dfr$is_freshfrozen %>% table()    
-           if(length(ff_tbl) == 2){
-               subset_dfr$is_material_rep = TRUE
-           } else {
-               subset_dfr$is_material_rep = FALSE
-           }
-           subset_dfr
-}) %>% do.call(rbind, .) 
+#using the replicate-removed georgeset we no longer need these replicate finding lines
+#georgeset$is_replicate <- ifelse(grepl("-([0-9])-([0-9])([a-z])_", colnames(georgeset),
+#                                       ignore.case = TRUE), 
+#                                   TRUE, 
+#                                   FALSE)
+#
+#sourcerep_tbl <- table(c(unique(georgeset[, georgeset$is_freshfrozen]$sample_id),
+#                         unique(georgeset[, !georgeset$is_freshfrozen]$sample_id)))
+#source_reps <- names(sourcerep_tbl[sourcerep_tbl != 1])
+#georgeset$is_material_rep <- georgeset$sample_id %in% source_reps
 ```
 
 Merge the final version of the phenotypic data and create the final expressionSet
