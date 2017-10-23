@@ -78,3 +78,21 @@ ggplot(timepoint_cor, aes(x = days_treated, y = cor, colour = is_dormant)) +
 ```
 
 <img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-8-1.png" style="display: block; margin: auto;" />
+
+#### Check that dormancy status is correct...
+
+``` r
+pheno <- pData(dormset)
+library(reshape2)
+xpr <- melt(exprs(dormset))
+
+mrg <- merge(xpr, pheno, by.x = 'Var2', by.y = 'sample_id')
+
+mrg$timepoint <- factor(mrg$timepoint, levels = c("diagnosis", "on-treatment", "long-term"))
+
+ggplot(mrg[which(mrg$Var1 %in% c("MKI67", "MCM2", "PCNA")),], aes(x = timepoint, y = value)) +
+    geom_boxplot() +
+    facet_grid(Var1~is_dormant, scales = 'free')
+```
+
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-9-1.png" style="display: block; margin: auto;" />
