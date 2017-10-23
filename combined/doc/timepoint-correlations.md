@@ -31,13 +31,19 @@ corByStatus <- function(eset){
 }
 
 all_cor <- corByStatus(dormset)
+```
 
+#### Intra-status correlations
+
+``` r
 ggplot(all_cor, aes(x = is_dormant, y = cor)) + 
     geom_boxplot(outlier.size = 0, notch = TRUE) + 
     geom_sina()
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-4-1.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-5-1.png" style="display: block; margin: auto;" />
+
+#### Intra-status correlations over time
 
 ``` r
 ggplot(all_cor, aes(x = days_treated, y = cor, colour = is_dormant)) + 
@@ -45,7 +51,9 @@ ggplot(all_cor, aes(x = days_treated, y = cor, colour = is_dormant)) +
     geom_smooth()
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-4-2.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-6-1.png" style="display: block; margin: auto;" />
+
+#### Intra-status & intra-timepoint correlations
 
 ``` r
 timepoint_cor <- lapply(c("diagnosis", "on-treatment", "long-term"), function(timepoint){
@@ -59,7 +67,9 @@ ggplot(timepoint_cor, aes(x = timepoint, y = cor)) +
     facet_wrap(~is_dormant, nrow = 1)
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-4-3.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-7-1.png" style="display: block; margin: auto;" />
+
+#### Intra-status & intra-timepoint correlations
 
 ``` r
 ggplot(timepoint_cor, aes(x = days_treated, y = cor, colour = is_dormant)) +
@@ -67,4 +77,4 @@ ggplot(timepoint_cor, aes(x = days_treated, y = cor, colour = is_dormant)) +
     geom_smooth()
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-4-4.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-8-1.png" style="display: block; margin: auto;" />

@@ -41,15 +41,28 @@ corByStatus <- function(eset){
 
 all_cor <- corByStatus(dormset)
 
+```
+
+#### Intra-status correlations
+
+```{r}
 ggplot(all_cor, aes(x = is_dormant, y = cor)) + 
     geom_boxplot(outlier.size = 0, notch = TRUE) + 
     geom_sina()
+```
 
+#### Intra-status correlations over time
+
+
+```{r}
 ggplot(all_cor, aes(x = days_treated, y = cor, colour = is_dormant)) + 
     geom_point() + 
     geom_smooth()
+```
 
+#### Intra-status & intra-timepoint correlations
 
+```{r}
 timepoint_cor <- lapply(c("diagnosis", "on-treatment", "long-term"), function(timepoint){
                             corByStatus(dormset[, which(dormset$timepoint == timepoint)])
 }) %>% do.call(rbind, .)
@@ -59,7 +72,11 @@ ggplot(timepoint_cor, aes(x = timepoint, y = cor)) +
 #    geom_jitter(width = 0.2) +
     geom_sina() +
     facet_wrap(~is_dormant, nrow = 1)
+```
 
+#### Intra-status & intra-timepoint correlations
+
+```{r}
 ggplot(timepoint_cor, aes(x = days_treated, y = cor, colour = is_dormant)) +
     geom_point() +
     geom_smooth()
