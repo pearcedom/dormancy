@@ -16,6 +16,7 @@ library(tidyverse)
 library(Biobase)
 library(affy)
 library(a4Base)
+library(testthat)
 ```
 
 The clinical information is a mess so we need to do some extensive curation and tidying. We'll
@@ -26,6 +27,7 @@ start with the USS data and begin by filling in missing values.
 ```{r}
 uss_dfr <- read.csv("../data/batch-2-uss.csv")
 ```
+
 
 For `Patient.ID` we need to simply replace NAs with the first previous value. So we take the
 indexes where the values are, calculate the space inbetween them and fill that space with the
@@ -190,12 +192,21 @@ pheno <- merge(ussclin_dfr, pData(georgeset), by = 'sample_id', all.y = TRUE)
 pheno$has_clin <- ifelse(pheno$is_biopsy, TRUE, FALSE)
 row.names(pheno) <- pheno$xpr_id
 
-identical(sort(colnames(exprs(georgeset))), sort(row.names(pheno)))
+#because some samples exist in georgeset that aren't in the clinical data (why??) some NAs have been introduced that we'll need to fill in with te appropriate data
+cols2fill <- c(2, 3, 5, 6, 10:35)
 
+phen1 <- lapply(unique(pheno$patient), function(x) {
+          dfr <- pheno[pheno$patient == x,]
+          for(i in cols2fill){
+                     dfr[, i] <- dfr[1, i] 
+          }
+          dfr
+}) %>% do.call(rbind, .)
+row.names(phen1) <- phen1$xpr_id
+
+identical(sort(colnames(exprs(georgeset))), sort(row.names(phen1)))
 
 georgeset_out <- georgeset[, order(colnames(exprs(georgeset)))]
-pData(georgeset_out) <- pheno[order(row.names(pheno)),]
+pData(georgeset_out) <- phen1[order(row.names(phen1)),]
 #write_rds(georgeset_out, "../output/georgeset-sep-frma-fselect-loess-clin.Rds")
 ```
-
-

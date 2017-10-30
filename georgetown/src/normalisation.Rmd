@@ -50,7 +50,6 @@ goodcalls_lst <- lapply(affybatch_lst, function(batch){
              })
 #retreive common probes and write out
 present_common <- do.call(intersect, goodcalls_lst)
-
 ```
 
 ```{r, echo = FALSE, eval = TRUE}

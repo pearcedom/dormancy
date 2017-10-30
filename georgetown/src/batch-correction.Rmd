@@ -47,6 +47,7 @@ source("../../../../functions/library/mdsArrange.R")
         theme(legend.position = 'bottom',
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank())
+
     #densityplot
     p_dist <- ggplot(george_mrg, aes(x = value, colour = is_freshfrozen, group = Var2), alpha = 0.05) + 
         geom_line(stat = 'density', alpha = 0.2) + 
@@ -146,7 +147,7 @@ test_that("eset overwrite worked as expected", {
              expect_identical(pData(georgeset), pData(georgeset_cb))
            })
 
-write_rds(georgeset_cb, "../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
+#write_rds(georgeset_cb, "../output/final-georgeset-sep-frma-fselect-loess-clin-cb.Rds")
 ```
 
 ### *The following is now redundent as duplilcate samples have been determined and removed previously*
