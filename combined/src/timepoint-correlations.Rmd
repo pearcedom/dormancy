@@ -1,5 +1,5 @@
 ---
-title: 
+title: Timepoint correlations
 author: Dominic Pearce
 output:
     github_document
@@ -81,7 +81,6 @@ ggplot(timepoint_cor, aes(x = timepoint, y = cor)) +
 ggplot(timepoint_cor, aes(x = days_treated, y = cor, colour = is_dormant)) +
     geom_point() +
     geom_smooth()
-
 ```
 
 #### Check that dormancy status is correct...
