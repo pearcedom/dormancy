@@ -30,3 +30,8 @@ I'm pretty sure 251-1/2/4-1a/1b FFPE should be 215 (or should some 215s be 251s?
 68 samples (24 patients) overlap between georgetown and edinburgh, so what can georgeset add to edset?
     57 additional samples (37 dormant, 6 desensitised, 14 NA)
     24 patients (16 dormant, 4 desensitised, 4 NA)
+
+Combined data
+    234 samples (151 dormant, 66 desensitised, 17 NA)
+    81 patients
+
