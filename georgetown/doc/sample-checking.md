@@ -32,6 +32,10 @@ I'm pretty sure 251-1/2/4-1a/1b FFPE should be 215 (or should some 215s be 251s?
     24 patients (16 dormant, 4 desensitised, 4 NA)
 
 Combined data
-    234 samples (151 dormant, 66 desensitised, 17 NA)
+    234 samples (150 dormant, 68 desensitised, 17 NA)
     81 patients
 
+
+Questions:
+    Is 30 days difference between final uss and final biopsy enough?
+        We give 120 days for the initial drop afterall 

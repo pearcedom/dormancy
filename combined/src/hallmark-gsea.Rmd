@@ -1,0 +1,31 @@
+---
+title: Hallmarks GSEA
+author: Dominic Pearce
+output:
+    github_document
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
+```
+
+```{r}
+library(tidyverse)
+library(GSEABase)
+```
+
+#### Here we're going to compare enrichment of the [Hallmark genesets](https://www.ncbi.nlm.nih.gov/pubmed/26771021) between dormant and desensitised patients.
+
+
+#### First we'll need to assemble the Hallmark genesets themselves (as a sensible easy to use list)
+
+```{r}
+hallmarks_base <- getGmt("../data/h.all.v6.1.symbols.gmt")
+hallmarks <- lapply(hallmarks_base, function(x){
+                        x@geneIds
+})
+names(hallmarks) <- names(hallmarks_base)
+```
+
+#### Next we need to arrange our data as two sets - dormants & desensitiseds
+
