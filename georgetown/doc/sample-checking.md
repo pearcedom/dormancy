@@ -12,8 +12,6 @@ Georgeset has
         25 are dormant, 10 desensitised and 8 NA
     125 unique samples (excluding UHRR)
 
-
-
 Cigdem's sample sheet has
     44 unique patients (this matches)
 
