@@ -18,6 +18,8 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align =
 
 #### //TODO recheck dormancy assignment consistency between datasets once xpr-based assigments have been made for georgeset
 
+#### //TODO The final reassignment step should really be performed in clinical-curation.rmd
+
 ```{r}
 library(tidyverse)
 library(Biobase)
@@ -236,9 +238,84 @@ test_that("there should be no conflicts in dormancy assignment within a patient 
                           }) %>% all()
                           )
 })
+```
 
-dormset_out <- dormset_cb_unique[, order(dormset_cb_unique$sample_id,
+#### Misc tidying up steps
+
+```{r}
+dormset_out1 <- dormset_cb_unique[, order(dormset_cb_unique$sample_id,
                                          dormset_cb_unique$days_treated)]
 
-#write_rds(dormset_out, "../output/dormset.rds")
+dormset_out2 <- dormset_out1[, !is.na(dormset_out1$is_dormant)]
+
+patient_vec <- unique(dormset_out2$patient)
+
+#despite not having days_treated info for all samples, if the last sample that does have days_treated data is long-term, then any subsetquent biopsies must also be long-term
+dormset_out3 <- dormset_out2
+pData(dormset_out3) <- lapply(patient_vec, function(patient){
+                           dfr <- pData(dormset_out2)[dormset_out2$patient == patient, ] 
+                           lts <- which(dfr$timepoint == 'long-term')
+                           nas <- which(is.na(dfr$timepoint))
+                           if(length(nas) >= 1 & 
+                              length(lts) >= 1 & 
+                              isTRUE(nas[1] > lts[length(lts)])){
+                               dfr[nas, 'timepoint'] <- 'long-term'
+                           }
+                           dfr
+}) %>% do.call(rbind, .)
+
+
+test_that("we've only changed those specific values in $timepoint", {
+              expect_identical(dim(dormset_out2), dim(dormset_out3))
+              expect_identical(pData(dormset_out2)[, 1:3], 
+                               pData(dormset_out3)[, 1:3])
+})
+
+#designate early/late biopsies if two fall within the same timepoint - i.e. if 
+#there are two long-term samples from the same patient
+dormset_out3$timepoint_split <- lapply(patient_vec, function(patient){
+           dfr <- pData(dormset_out3)[dormset_out3$patient == patient, ] 
+           tp_tbl <- table(dfr$timepoint)
+           multi_vec <- lapply(unique(dfr$timepoint), function(tp){
+                                   if(is.na(tp)){
+                                       NA
+                                   }
+                                   else if(tp_tbl[tp] > 1){
+                                       if(tp == 'on-treatment'){
+                                        LETTERS[1:tp_tbl[tp]]
+                                       } else if(tp == 'long-term')
+                                        LETTERS[tp_tbl[tp]:1]
+                                   } else {
+                                       NA
+                                   }
+                          }) %>% unlist()
+           multi_vec
+}) %>% do.call(c, .)
+
+#check against set2 again
+test_that("we've only changed those specific values in $timepoint", {
+              expect_identical(dim(dormset_out2), dim(dormset_out3))
+              expect_identical(pData(dormset_out2)[, 1:3], 
+                               pData(dormset_out3)[, 1:3])
+})
+
+#patients 298 (D>AR), 341 (AR>D), 400 (AR>D) and 347 (D>AR) need to be reclassified according to xpr measurements
+dormset_out3$is_dormant <- sapply(dormset_out3$patient, function(x)
+       ifelse(x == 298, FALSE, dormset_out3$is_dormant[dormset_out3$patient == x])
+       )
+dormset_out3$is_dormant <- sapply(dormset_out3$patient, function(x)
+       ifelse(x == 341, TRUE, dormset_out3$is_dormant[dormset_out3$patient == x])
+       )
+dormset_out3$is_dormant <- sapply(dormset_out3$patient, function(x)
+       ifelse(x == 400, TRUE, dormset_out3$is_dormant[dormset_out3$patient == x])
+       )
+dormset_out3$is_dormant <- sapply(dormset_out3$patient, function(x)
+       ifelse(x == 347, FALSE, dormset_out3$is_dormant[dormset_out3$patient == x])
+       )
+```
+
+#### Write
+
+```{r}
+#write_rds(dormset_out3, "../output/dormset.rds")
 ```
