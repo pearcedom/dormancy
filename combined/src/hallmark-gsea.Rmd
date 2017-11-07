@@ -10,6 +10,14 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align =
                       fig.width = 9, fig.height = 6.5)
 ```
 
+<!--
+//TODO  -When having two scores with the same name its average was used. 
+        -Zeros were removed. 
+        -Scores without names (which can not be in any signature) removed. 
+        -Non complete cases (i.e. NAs, NaNs) were removed
+-->
+
+
 ```{r}
 library(tidyverse)
 library(GSEABase)
