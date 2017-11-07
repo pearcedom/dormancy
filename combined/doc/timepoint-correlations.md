@@ -6,15 +6,22 @@ Dominic Pearce
 library(tidyverse)
 library(Biobase)
 library(ggforce)
+source("/Volumes/igmm/sims-lab/Dominic/functions/mostVar.R")
 ```
 
 ``` r
 dormset <- read_rds("../output/dormset.rds")
+
+#dormset$is_dormant <- sapply(dormset$patient, function(x)
+#       ifelse(x == 347, FALSE, dormset$is_dormant[dormset$patient == x])
+#       )
 ```
 
 #### Here we're going to characterise our patients based on the sampling timepoints - *diagnostic*, *on-treatment* and *long-term* - where we would anticipate desensitised patients to exhibit decreasing correlation at later timepoints, and vice versa for dormant patients.
 
 #### We can also extend this categorical comparison to simply compare correlation vs. time on treatment.
+
+#### All correlations are per-sample and are calculated in a paired manner for each patient.
 
 ``` r
 corArrange <- function(eset){
@@ -28,22 +35,44 @@ corArrange <- function(eset){
 
 corByStatus <- function(eset){
     lapply(c(TRUE, FALSE), function(logical){
-               corArrange(dormset[, which(dormset$is_dormant == logical)])
-}) %>% do.call(rbind, .)
+               statusset <- eset[, which(eset$is_dormant == logical)]
+               lapply(unique(statusset$patient), function(patient){
+                          patientset <- statusset[, which(statusset$patient == patient)]
+                          corArrange(patientset)
+               }) %>% do.call(rbind, .)
+    }) %>% do.call(rbind, .)
 }
-
-all_cor <- corByStatus(dormset)
 ```
 
 #### Intra-status correlations
 
 ``` r
+all_cor <- corByStatus(dormset)
+
 ggplot(all_cor, aes(x = is_dormant, y = cor)) + 
     geom_boxplot(outlier.size = 0, notch = TRUE) + 
     geom_sina()
 ```
 
 <img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-5-1.png" style="display: block; margin: auto;" />
+
+``` r
+ggplot(all_cor, aes(x = is_dormant, y = cor)) + 
+    geom_boxplot(outlier.size = 0, notch = TRUE) + 
+    geom_sina() + 
+    facet_wrap(~timepoint, nrow = 1)
+```
+
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-5-2.png" style="display: block; margin: auto;" />
+
+``` r
+ggplot(all_cor, aes(x = timepoint, y = cor)) + 
+    geom_boxplot(outlier.size = 0, notch = TRUE) + 
+    geom_sina() + 
+    facet_wrap(~is_dormant)
+```
+
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-5-3.png" style="display: block; margin: auto;" />
 
 #### Intra-status correlations over time
 
@@ -55,21 +84,43 @@ ggplot(all_cor, aes(x = days_treated, y = cor, colour = is_dormant)) +
 
 <img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-6-1.png" style="display: block; margin: auto;" />
 
+``` r
+ggplot(all_cor, aes(x = days_treated, y = cor, colour = is_dormant)) + 
+    geom_point() + 
+    geom_smooth() +
+    xlim(0, 500)
+```
+
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-6-2.png" style="display: block; margin: auto;" />
+
 #### Intra-status & intra-timepoint correlations
 
 ``` r
 timepoint_cor <- lapply(c("diagnosis", "on-treatment", "long-term"), function(timepoint){
-                            corByStatus(dormset[, which(dormset$timepoint == timepoint)])
+                            dfr <- corByStatus(dormset[, which(dormset$timepoint != timepoint)])
+                            dfr$cor_comp <- factor(paste0(unique(dfr$timepoint), collapse = "-"),
+                                                   levels = c("diagnosis-on-treatment", 
+                                                              "diagnosis-long-term",
+                                                              "on-treatment-long-term"))
+                            dfr
 }) %>% do.call(rbind, .)
 
-ggplot(timepoint_cor, aes(x = timepoint, y = cor)) + 
+ggplot(timepoint_cor, aes(x = cor_comp, y = cor)) + 
     geom_boxplot(outlier.size = 0, notch = TRUE) +
-#    geom_jitter(width = 0.2) +
     geom_sina() +
     facet_wrap(~is_dormant, nrow = 1)
 ```
 
 <img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-7-1.png" style="display: block; margin: auto;" />
+
+``` r
+ggplot(timepoint_cor, aes(x = is_dormant, y = cor)) + 
+    geom_boxplot(outlier.size = 0, notch = TRUE) +
+    geom_sina() +
+    facet_wrap(~cor_comp, nrow = 1)
+```
+
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-7-2.png" style="display: block; margin: auto;" />
 
 #### Intra-status & intra-timepoint correlations
 
@@ -80,6 +131,15 @@ ggplot(timepoint_cor, aes(x = days_treated, y = cor, colour = is_dormant)) +
 ```
 
 <img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-8-1.png" style="display: block; margin: auto;" />
+
+``` r
+ggplot(timepoint_cor, aes(x = days_treated, y = cor, colour = is_dormant)) +
+    geom_point() +
+    geom_smooth() +
+    xlim(0, 500)
+```
+
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-8-2.png" style="display: block; margin: auto;" />
 
 #### Check that dormancy status is correct...
 
