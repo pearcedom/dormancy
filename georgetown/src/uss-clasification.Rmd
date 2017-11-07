@@ -135,16 +135,14 @@ ggplot(xpr_input, aes(x = days_treated, y = value, colour = is_dormant, group = 
     geom_line() +
     facet_wrap(~is_dormant, scales = 'free', ncol = 5) + 
 #    theme_pander() + 
-    theme(legend.position = 'bottom') + 
-    ggtitle("Unfinished")
+    theme(legend.position = 'bottom')
 
 ggplot(xpr_input, aes(x = days_treated, y = value, colour = is_dormant, group = patient_id)) + 
     geom_point(size = 0.6) + 
     geom_line() +
     facet_wrap(~patient_id, scales = 'free', ncol = 5) + 
 #    theme_pander() + 
-    theme(legend.position = 'bottom') + 
-    ggtitle("Unfinished")
+    theme(legend.position = 'bottom')
 ```
 
 #### Visually, samples to re-assign are
