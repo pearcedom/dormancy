@@ -11,10 +11,6 @@ source("/Volumes/igmm/sims-lab/Dominic/functions/mostVar.R")
 
 ``` r
 dormset <- read_rds("../output/dormset.rds")
-
-#dormset$is_dormant <- sapply(dormset$patient, function(x)
-#       ifelse(x == 347, FALSE, dormset$is_dormant[dormset$patient == x])
-#       )
 ```
 
 #### Here we're going to characterise our patients based on the sampling timepoints - *diagnostic*, *on-treatment* and *long-term* - where we would anticipate desensitised patients to exhibit decreasing correlation at later timepoints, and vice versa for dormant patients.
