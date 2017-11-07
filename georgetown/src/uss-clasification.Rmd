@@ -31,11 +31,11 @@ ggplot(dormant_dfr, aes(x = days_treated,
                         y = relative_vol, 
                         group = patient_id, 
                         colour = is_dormant)) + 
-    geom_vline(xintercept = c(90), linetype = 3) + 
+    geom_vline(xintercept = c(120), linetype = 3) + 
     geom_hline(yintercept = 60, linetype = 3) + 
     geom_line() + 
     scale_y_continuous(breaks = c(0, 60, 100, 200)) +
-    scale_x_continuous(breaks = c(0, 90, 500, 1000)) +
+    scale_x_continuous(breaks = c(0, 120, 500, 1000)) +
     theme_pander() +
     theme(legend.position = 'bottom')
 ```
@@ -49,11 +49,11 @@ p_uss <- ggplot(dormonly_dfr, aes(x = days_treated,
                         y = relative_vol, 
                         group = patient_id, 
                         colour = is_dormant)) + 
-    geom_vline(xintercept = 90, linetype = 3) + 
+    geom_vline(xintercept = 120, linetype = 3) + 
     geom_hline(yintercept = 60, linetype = 3) + 
     geom_line() + 
     scale_y_continuous(breaks = c(0, 60, 100, 200)) +
-    scale_x_continuous(breaks = c(0, 90, 120, 500, 1000)) +
+    scale_x_continuous(breaks = c(0, 120, 120, 500, 1000)) +
     theme_pander() +
     theme(legend.position = 'bottom')
 
@@ -98,7 +98,7 @@ xprdorm_dfr <- lapply(unique(dormant_dfr$patient_id), function(patient){
         #but are enough biopsies
         to_reassign <- all(c(!is.na(unique(int_dfr$is_dormant)),
                              sum(int_dfr$is_biopsy) > 2)) &
-                       any(c(final_biopsy - final_uss > 90, 
+                       any(c(final_biopsy - final_uss > 30, 
                              sum(int_dfr$is_uss) <= 2))
         data.frame(patient_id = patient, is_xprdorm = to_reassign)
 }) %>% do.call(rbind, .)
@@ -123,30 +123,23 @@ xpr_mrg$timepoint <- factor(xpr_mrg$timepoint, levels = c("diagnosis", "on-treat
 #for each patient make the expression relative to the first biopsy as a percentage
 xpr_input <- lapply(unique(xpr_mrg$patient_id), function(patient){
                         dfr <- xpr_mrg[which(xpr_mrg$patient_id == patient),]
-                        pcnt100 <- dfr[which.min(dfr$days_treated), ]$value
-                        dfr$value <- dfr$value / pcnt100 * 100
+                        pcnt100 <- 2^dfr[which.min(dfr$days_treated), ]$value
+                        dfr$value <- 2^dfr$value / pcnt100 * 100
                         dfr
                      }) %>% do.call(rbind, .)
-
-
-ggplot(xpr_input, aes(x = days_treated, y = value, colour = is_dormant, group = patient_id)) + 
-    geom_line() +
-    facet_wrap(~is_dormant, scales = 'free', ncol = 5) + 
-#    theme_pander() + 
-    theme(legend.position = 'bottom') + 
-    ggtitle("Unfinished")
-
-ggplot(xpr_input, aes(x = timepoint, y = value, colour = is_dormant, group = patient_id)) + 
-    geom_line() +
-    facet_wrap(~is_dormant, scales = 'free', ncol = 5) + 
-#    theme_pander() + 
-    theme(legend.position = 'bottom') + 
-    ggtitle("Unfinished")
 ```
 
 
 ```{r, fig.height = 14}
 ggplot(xpr_input, aes(x = days_treated, y = value, colour = is_dormant, group = patient_id)) + 
+    geom_line() +
+    facet_wrap(~is_dormant, scales = 'free', ncol = 5) + 
+#    theme_pander() + 
+    theme(legend.position = 'bottom') + 
+    ggtitle("Unfinished")
+
+ggplot(xpr_input, aes(x = days_treated, y = value, colour = is_dormant, group = patient_id)) + 
+    geom_point(size = 0.6) + 
     geom_line() +
     facet_wrap(~patient_id, scales = 'free', ncol = 5) + 
 #    theme_pander() + 
@@ -154,3 +147,8 @@ ggplot(xpr_input, aes(x = days_treated, y = value, colour = is_dormant, group = 
     ggtitle("Unfinished")
 ```
 
+#### Visually, samples to re-assign are
+- 298 (L>S)
+- 341 (S>L)
+- 400 (S>L)
+- 347 (L>S)
