@@ -136,5 +136,29 @@ ggplot(mrg[which(mrg$Var1 %in% c("MKI67", "MCM2", "PCNA")),], aes(x = timepoint,
 
 ```
 
+#### How do patients' intra-correlations compare to overall correlation between all patients/samples?
 
+```{r}
+interCorByStatus <- function(eset){
+    lapply(c(TRUE, FALSE), function(logical){
+               statusset <- eset[, which(eset$is_dormant == logical)]
+               corArrange(statusset)
+    }) %>% do.call(rbind, .)
+}
+
+intercor <- interCorByStatus(dormset)
+inter_intra <- rbind(intercor, all_cor)
+inter_intra$comparison <- rep(c("inter", "intra"), each = 218)
+
+ggplot(inter_intra, aes(x = comparison, y = cor)) +
+    geom_boxplot(notch = TRUE) +
+    geom_sina() +
+    facet_wrap(~is_dormant)
+
+ggplot(inter_intra, aes(x = is_dormant, y = cor)) +
+    geom_boxplot(notch = TRUE) +
+    geom_sina() +
+    facet_wrap(~comparison)
+
+```
 
