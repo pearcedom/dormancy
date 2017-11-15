@@ -48,11 +48,51 @@ corByStatus <- function(eset){
 }
 ```
 
+# Inter-patient correlations
+```{r}
+asdf <- function(eset){
+    lapply(c("diagnosis", "on-treatment", "long-term"), function(logical){
+               timeset <- eset[, which(eset$timepoint == logical)]
+               lapply(c(TRUE, FALSE), function(x){
+                              statusset <- timeset[, which(timeset$is_dormant == x)]
+                              corArrange(statusset)
+               }) %>% do.call(rbind, .)
+    }) %>% do.call(rbind, .)
+}
+
+all_cor <- corByStatus(dormset)
+
+inter_cor <- asdf(dormset)
+ggplot(inter_cor, aes(x = is_dormant, y = cor, fill = timepoint)) + geom_boxplot(notch = TRUE)
+
+lapply(c(TRUE, FALSE), function(x){
+               aov(cor ~ timepoint, data = inter_cor[which(inter_cor$is_dormant == x),]) %>%
+                       summary()
+    })
+```
+
+<!-- I don't think this is particularly informative
+```{r}
+#when interpatient correlations are calculated separately by status and separately by timepoint, there is no significant change in corelataion for dorments but there is for desensitiseds. This is mostly driven by the fact that desensitised diagnostic samples are not well correlated with one another.
+
+#So let's compare only diagnostic samples
+
+diagnoset <- dormset[, which(dormset$timepoint == "diagnosis")]
+
+corArrange(diagnoset) %>%
+        ggplot(aes(x = timepoint, y = cor)) + 
+        geom_boxplot(aes(fill = is_dormant), width = 0.3, notch = TRUE) + 
+        geom_boxplot(alpha = 0.2, width = 0.08) 
+
+wilcox.test(cor ~ is_dormant, data = inter_cor[which(inter_cor$timepoint == "diagnosis"),]) 
+```
+-->
+
+## Intra-patient correlations
+
 #### Intra-status correlations
 
 ```{r}
-all_cor <- corByStatus(dormset)
-
 ggplot(all_cor, aes(x = is_dormant, y = cor)) + 
     geom_boxplot(outlier.size = 0, notch = TRUE) + 
     geom_sina()
@@ -136,6 +176,7 @@ ggplot(mrg[which(mrg$Var1 %in% c("MKI67", "MCM2", "PCNA")),], aes(x = timepoint,
 
 ```
 
+<!-- I'm not convinced this was the best way to perform this comparison (compared to the inter-patient correlations above, so I've removed it for now)
 #### How do patients' intra-correlations compare to overall correlation between all patients/samples?
 
 ```{r}
@@ -161,4 +202,4 @@ ggplot(inter_intra, aes(x = is_dormant, y = cor)) +
     facet_wrap(~comparison)
 
 ```
-
+-->
