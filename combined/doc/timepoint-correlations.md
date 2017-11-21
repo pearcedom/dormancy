@@ -5,19 +5,24 @@ Dominic Pearce
 ``` r
 library(tidyverse)
 library(Biobase)
+library(reshape2)
 library(ggforce)
 source("/Volumes/igmm/sims-lab/Dominic/functions/mostVar.R")
 ```
 
 ``` r
 dormset <- read_rds("../output/dormset.rds")
+pData(dormset)[dormset$patient == 343,]$is_dormant <- TRUE
+pData(dormset)[dormset$patient == 374,]$is_dormant <- TRUE
+```
+
+``` r
+timepoints <- c("diagnosis", "on-treatment", "long-term")
 ```
 
 #### Here we're going to characterise our patients based on the sampling timepoints - *diagnostic*, *on-treatment* and *long-term* - where we would anticipate desensitised patients to exhibit decreasing correlation at later timepoints, and vice versa for dormant patients.
 
 #### We can also extend this categorical comparison to simply compare correlation vs. time on treatment.
-
-#### All correlations are per-sample and are calculated in a paired manner for each patient.
 
 ``` r
 corArrange <- function(eset){
@@ -25,10 +30,107 @@ corArrange <- function(eset){
     diag(cor_mtx) <- NA
     cor_vec <- data.frame(cor = colMeans(cor_mtx, na.rm = TRUE))
     cor_mrg <- merge(cor_vec, pData(eset), by = 0)
-    cor_mrg$timepoint <- factor(cor_mrg$timepoint, levels = c("diagnosis", "on-treatment", "long-term"))
+    cor_mrg$timepoint <- factor(cor_mrg$timepoint, levels = timepoints)
     cor_mrg
 }
+```
 
+Inter-patient correlations
+==========================
+
+#### We can compare dormants to desensitiseds at each timepoint to determine at which point the two classes are most/least similar to one another.
+
+``` r
+tp_cor <- lapply(timepoints, function(biopsy){
+                timeset <- dormset[, which(dormset$timepoint == biopsy)]
+                dorm <- timeset[, which(timeset$is_dormant)] %>% exprs()
+                dssn <- timeset[, which(!timeset$is_dormant)] %>% exprs()
+                cor_dfr <- cor(dorm, dssn)
+                mlt_dfr <- melt(cor_dfr)
+                mlt_dfr$timepoint <- factor(biopsy, levels = timepoints)
+                mlt_dfr
+    }) %>% do.call(rbind, .)
+
+ggplot(tp_cor, aes(x = timepoint, y = value)) + 
+        geom_sina() +
+        geom_boxplot(outlier.size = 0, notch = TRUE, alpha = 0.95) 
+```
+
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-5-1.png" style="display: block; margin: auto;" />
+
+#### On-treatment vs. long-term significance is...
+
+``` r
+tp_cor[which(tp_cor$timepoint != "diagnosis"),] %>% wilcox.test(value ~ timepoint, data = .)
+```
+
+    ## 
+    ##  Wilcoxon rank sum test with continuity correction
+    ## 
+    ## data:  value by timepoint
+    ## W = 411750, p-value = 0.5757
+    ## alternative hypothesis: true location shift is not equal to 0
+
+#### We can also perform this analysis independently for dormant and desensitiseds, calculating the correlation again within timepoints but also within dormancy statuses.
+
+``` r
+interCors <- function(eset){
+    lapply(timepoints, function(biopsy){
+               timeset <- eset[, which(eset$timepoint == biopsy)]
+               lapply(c(TRUE, FALSE), function(x){
+                              statusset <- timeset[, which(timeset$is_dormant == x)]
+                              corArrange(statusset)
+               }) %>% do.call(rbind, .)
+    }) %>% do.call(rbind, .)
+}
+
+inter_cor <- interCors(dormset)
+ggplot(inter_cor, aes(x = is_dormant, y = cor, fill = timepoint)) + geom_boxplot(notch = TRUE)
+```
+
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-7-1.png" style="display: block; margin: auto;" />
+
+``` r
+aov_lst <- lapply(c(TRUE, FALSE), function(x){
+               aov(cor ~ timepoint, data = inter_cor[which(inter_cor$is_dormant == x),]) %>%
+                       summary()
+    })
+names(aov_lst) <- c("Dormant", "Desensitised")
+aov_lst
+```
+
+    ## $Dormant
+    ##              Df  Sum Sq   Mean Sq F value Pr(>F)  
+    ## timepoint     2 0.00419 0.0020964   3.241 0.0419 *
+    ## Residuals   148 0.09572 0.0006468                 
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## $Desensitised
+    ##             Df   Sum Sq   Mean Sq F value  Pr(>F)   
+    ## timepoint    2 0.005329 0.0026644   5.337 0.00762 **
+    ## Residuals   55 0.027460 0.0004993                   
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+``` r
+wilcox.test(cor ~ is_dormant, data = inter_cor[which(inter_cor$timepoint == "diagnosis" & 
+                                                     !is.na(inter_cor$is_dormant)), ])
+```
+
+    ## 
+    ##  Wilcoxon rank sum test with continuity correction
+    ## 
+    ## data:  cor by is_dormant
+    ## W = 365, p-value = 0.04189
+    ## alternative hypothesis: true location shift is not equal to 0
+
+Intra-patient correlations
+--------------------------
+
+#### Intra-status correlations
+
+``` r
 corByStatus <- function(eset){
     lapply(c(TRUE, FALSE), function(logical){
                statusset <- eset[, which(eset$is_dormant == logical)]
@@ -38,85 +140,9 @@ corByStatus <- function(eset){
                }) %>% do.call(rbind, .)
     }) %>% do.call(rbind, .)
 }
-```
-
-Inter-patient correlations
-==========================
-
-``` r
-asdf <- function(eset){
-    lapply(c("diagnosis", "on-treatment", "long-term"), function(logical){
-               timeset <- eset[, which(eset$timepoint == logical)]
-               lapply(c(TRUE, FALSE), function(x){
-                              statusset <- timeset[, which(timeset$is_dormant == x)]
-                              corArrange(statusset)
-               }) %>% do.call(rbind, .)
-    }) %>% do.call(rbind, .)
-}
 
 all_cor <- corByStatus(dormset)
-
-inter_cor <- asdf(dormset)
-ggplot(inter_cor, aes(x = is_dormant, y = cor, fill = timepoint)) + geom_boxplot(notch = TRUE)
 ```
-
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-5-1.png" style="display: block; margin: auto;" />
-
-``` r
-lapply(c(TRUE, FALSE), function(x){
-               aov(cor ~ timepoint, data = inter_cor[which(inter_cor$is_dormant == x),]) %>%
-                       summary()
-    })
-```
-
-    ## [[1]]
-    ##              Df  Sum Sq   Mean Sq F value Pr(>F)  
-    ## timepoint     2 0.00329 0.0016467   2.444 0.0906 .
-    ## Residuals   139 0.09366 0.0006738                 
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    ## 
-    ## [[2]]
-    ##             Df   Sum Sq   Mean Sq F value  Pr(>F)   
-    ## timepoint    2 0.005716 0.0028582   6.121 0.00369 **
-    ## Residuals   64 0.029884 0.0004669                   
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-<!-- I don't think this is particularly informative
-
-```r
-#when interpatient correlations are calculated separately by status and separately by timepoint, there is no significant change in corelataion for dorments but there is for desensitiseds. This is mostly driven by the fact that desensitised diagnostic samples are not well correlated with one another.
-
-#So let's compare only diagnostic samples
-
-diagnoset <- dormset[, which(dormset$timepoint == "diagnosis")]
-
-corArrange(diagnoset) %>%
-        ggplot(aes(x = timepoint, y = cor)) + 
-        geom_boxplot(aes(fill = is_dormant), width = 0.3, notch = TRUE) + 
-        geom_boxplot(alpha = 0.2, width = 0.08) 
-```
-
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-6-1.png" style="display: block; margin: auto;" />
-
-```r
-wilcox.test(cor ~ is_dormant, data = inter_cor[which(inter_cor$timepoint == "diagnosis"),]) 
-```
-
-```
-## 
-##  Wilcoxon rank sum test with continuity correction
-## 
-## data:  cor by is_dormant
-## W = 420, p-value = 0.0912
-## alternative hypothesis: true location shift is not equal to 0
-```
--->
-Intra-patient correlations
---------------------------
-
-#### Intra-status correlations
 
 ``` r
 ggplot(all_cor, aes(x = is_dormant, y = cor)) + 
@@ -124,7 +150,7 @@ ggplot(all_cor, aes(x = is_dormant, y = cor)) +
     geom_sina()
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-7-1.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-9-1.png" style="display: block; margin: auto;" />
 
 ``` r
 ggplot(all_cor, aes(x = is_dormant, y = cor)) + 
@@ -133,7 +159,7 @@ ggplot(all_cor, aes(x = is_dormant, y = cor)) +
     facet_wrap(~timepoint, nrow = 1)
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-7-2.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-9-2.png" style="display: block; margin: auto;" />
 
 ``` r
 ggplot(all_cor, aes(x = timepoint, y = cor)) + 
@@ -142,7 +168,7 @@ ggplot(all_cor, aes(x = timepoint, y = cor)) +
     facet_wrap(~is_dormant)
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-7-3.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-9-3.png" style="display: block; margin: auto;" />
 
 #### Intra-status correlations over time
 
@@ -152,7 +178,7 @@ ggplot(all_cor, aes(x = days_treated, y = cor, colour = is_dormant)) +
     geom_smooth()
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-8-1.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-10-1.png" style="display: block; margin: auto;" />
 
 ``` r
 ggplot(all_cor, aes(x = days_treated, y = cor, colour = is_dormant)) + 
@@ -161,12 +187,12 @@ ggplot(all_cor, aes(x = days_treated, y = cor, colour = is_dormant)) +
     xlim(0, 500)
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-8-2.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-10-2.png" style="display: block; margin: auto;" />
 
 #### Intra-status & intra-timepoint correlations
 
 ``` r
-timepoint_cor <- lapply(c("diagnosis", "on-treatment", "long-term"), function(timepoint){
+timepoint_cor <- lapply(timepoints, function(timepoint){
                             dfr <- corByStatus(dormset[, which(dormset$timepoint != timepoint)])
                             dfr$cor_comp <- factor(paste0(unique(dfr$timepoint), collapse = "-"),
                                                    levels = c("diagnosis-on-treatment", 
@@ -181,7 +207,7 @@ ggplot(timepoint_cor, aes(x = cor_comp, y = cor)) +
     facet_wrap(~is_dormant, nrow = 1)
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-9-1.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-11-1.png" style="display: block; margin: auto;" />
 
 ``` r
 ggplot(timepoint_cor, aes(x = is_dormant, y = cor)) + 
@@ -190,7 +216,7 @@ ggplot(timepoint_cor, aes(x = is_dormant, y = cor)) +
     facet_wrap(~cor_comp, nrow = 1)
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-9-2.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-11-2.png" style="display: block; margin: auto;" />
 
 #### Intra-status & intra-timepoint correlations
 
@@ -200,7 +226,7 @@ ggplot(timepoint_cor, aes(x = days_treated, y = cor, colour = is_dormant)) +
     geom_smooth()
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-10-1.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-12-1.png" style="display: block; margin: auto;" />
 
 ``` r
 ggplot(timepoint_cor, aes(x = days_treated, y = cor, colour = is_dormant)) +
@@ -209,7 +235,7 @@ ggplot(timepoint_cor, aes(x = days_treated, y = cor, colour = is_dormant)) +
     xlim(0, 500)
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-10-2.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-12-2.png" style="display: block; margin: auto;" />
 
 #### Check that dormancy status is correct...
 
@@ -220,14 +246,14 @@ xpr <- melt(exprs(dormset))
 
 mrg <- merge(xpr, pheno, by.x = 'Var2', by.y = 'sample_id')
 
-mrg$timepoint <- factor(mrg$timepoint, levels = c("diagnosis", "on-treatment", "long-term"))
+mrg$timepoint <- factor(mrg$timepoint, levels = timepoints)
 
 ggplot(mrg[which(mrg$Var1 %in% c("MKI67", "MCM2", "PCNA")),], aes(x = timepoint, y = value)) +
     geom_boxplot() +
     facet_grid(Var1~is_dormant, scales = 'free')
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-11-1.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-13-1.png" style="display: block; margin: auto;" />
 
 <!-- I'm not convinced this was the best way to perform this comparison (compared to the inter-patient correlations above, so I've removed it for now)
 #### How do patients' intra-correlations compare to overall correlation between all patients/samples?
@@ -251,7 +277,7 @@ ggplot(inter_intra, aes(x = comparison, y = cor)) +
     facet_wrap(~is_dormant)
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-12-1.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-14-1.png" style="display: block; margin: auto;" />
 
 ```r
 ggplot(inter_intra, aes(x = is_dormant, y = cor)) +
@@ -260,5 +286,5 @@ ggplot(inter_intra, aes(x = is_dormant, y = cor)) +
     facet_wrap(~comparison)
 ```
 
-<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-12-2.png" style="display: block; margin: auto;" />
+<img src="timepoint-correlations_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-14-2.png" style="display: block; margin: auto;" />
 -->

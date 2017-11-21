@@ -13,19 +13,24 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align =
 ```{r}
 library(tidyverse)
 library(Biobase)
+library(reshape2)
 library(ggforce)
 source("/Volumes/igmm/sims-lab/Dominic/functions/mostVar.R")
 ```
 
 ```{r}
 dormset <- read_rds("../output/dormset.rds")
+pData(dormset)[dormset$patient == 343,]$is_dormant <- TRUE
+pData(dormset)[dormset$patient == 374,]$is_dormant <- TRUE
+```
+
+```{r repeated used variables}
+timepoints <- c("diagnosis", "on-treatment", "long-term")
 ```
 
 #### Here we're going to characterise our patients based on the sampling timepoints - *diagnostic*, *on-treatment* and *long-term* - where we would anticipate desensitised patients to exhibit decreasing correlation at later timepoints, and vice versa for dormant patients.
 
 #### We can also extend this categorical comparison to simply compare correlation vs. time on treatment.
-
-#### All correlations are per-sample and are calculated in a paired manner for each patient.
 
 ```{r}
 corArrange <- function(eset){
@@ -33,10 +38,70 @@ corArrange <- function(eset){
     diag(cor_mtx) <- NA
     cor_vec <- data.frame(cor = colMeans(cor_mtx, na.rm = TRUE))
     cor_mrg <- merge(cor_vec, pData(eset), by = 0)
-    cor_mrg$timepoint <- factor(cor_mrg$timepoint, levels = c("diagnosis", "on-treatment", "long-term"))
+    cor_mrg$timepoint <- factor(cor_mrg$timepoint, levels = timepoints)
     cor_mrg
 }
 
+```
+
+# Inter-patient correlations
+
+#### We can compare dormants to desensitiseds at each timepoint to determine at which point the two classes are most/least similar to one another.
+
+```{r}
+tp_cor <- lapply(timepoints, function(biopsy){
+                timeset <- dormset[, which(dormset$timepoint == biopsy)]
+                dorm <- timeset[, which(timeset$is_dormant)] %>% exprs()
+                dssn <- timeset[, which(!timeset$is_dormant)] %>% exprs()
+                cor_dfr <- cor(dorm, dssn)
+                mlt_dfr <- melt(cor_dfr)
+                mlt_dfr$timepoint <- factor(biopsy, levels = timepoints)
+                mlt_dfr
+    }) %>% do.call(rbind, .)
+
+ggplot(tp_cor, aes(x = timepoint, y = value)) + 
+        geom_sina() +
+        geom_boxplot(outlier.size = 0, notch = TRUE, alpha = 0.95) 
+```
+
+#### On-treatment vs. long-term significance is...
+
+```{r}
+tp_cor[which(tp_cor$timepoint != "diagnosis"),] %>% wilcox.test(value ~ timepoint, data = .)
+```
+
+#### We can also perform this analysis independently for dormant and desensitiseds, calculating the correlation again within timepoints but also within dormancy statuses. 
+
+```{r}
+interCors <- function(eset){
+    lapply(timepoints, function(biopsy){
+               timeset <- eset[, which(eset$timepoint == biopsy)]
+               lapply(c(TRUE, FALSE), function(x){
+                              statusset <- timeset[, which(timeset$is_dormant == x)]
+                              corArrange(statusset)
+               }) %>% do.call(rbind, .)
+    }) %>% do.call(rbind, .)
+}
+
+inter_cor <- interCors(dormset)
+ggplot(inter_cor, aes(x = is_dormant, y = cor, fill = timepoint)) + geom_boxplot(notch = TRUE)
+
+aov_lst <- lapply(c(TRUE, FALSE), function(x){
+               aov(cor ~ timepoint, data = inter_cor[which(inter_cor$is_dormant == x),]) %>%
+                       summary()
+    })
+names(aov_lst) <- c("Dormant", "Desensitised")
+aov_lst
+
+wilcox.test(cor ~ is_dormant, data = inter_cor[which(inter_cor$timepoint == "diagnosis" & 
+                                                     !is.na(inter_cor$is_dormant)), ])
+```
+
+## Intra-patient correlations
+
+#### Intra-status correlations
+
+```{r}
 corByStatus <- function(eset){
     lapply(c(TRUE, FALSE), function(logical){
                statusset <- eset[, which(eset$is_dormant == logical)]
@@ -46,51 +111,9 @@ corByStatus <- function(eset){
                }) %>% do.call(rbind, .)
     }) %>% do.call(rbind, .)
 }
-```
-
-# Inter-patient correlations
-```{r}
-asdf <- function(eset){
-    lapply(c("diagnosis", "on-treatment", "long-term"), function(logical){
-               timeset <- eset[, which(eset$timepoint == logical)]
-               lapply(c(TRUE, FALSE), function(x){
-                              statusset <- timeset[, which(timeset$is_dormant == x)]
-                              corArrange(statusset)
-               }) %>% do.call(rbind, .)
-    }) %>% do.call(rbind, .)
-}
 
 all_cor <- corByStatus(dormset)
-
-inter_cor <- asdf(dormset)
-ggplot(inter_cor, aes(x = is_dormant, y = cor, fill = timepoint)) + geom_boxplot(notch = TRUE)
-
-lapply(c(TRUE, FALSE), function(x){
-               aov(cor ~ timepoint, data = inter_cor[which(inter_cor$is_dormant == x),]) %>%
-                       summary()
-    })
 ```
-
-<!-- I don't think this is particularly informative
-```{r}
-#when interpatient correlations are calculated separately by status and separately by timepoint, there is no significant change in corelataion for dorments but there is for desensitiseds. This is mostly driven by the fact that desensitised diagnostic samples are not well correlated with one another.
-
-#So let's compare only diagnostic samples
-
-diagnoset <- dormset[, which(dormset$timepoint == "diagnosis")]
-
-corArrange(diagnoset) %>%
-        ggplot(aes(x = timepoint, y = cor)) + 
-        geom_boxplot(aes(fill = is_dormant), width = 0.3, notch = TRUE) + 
-        geom_boxplot(alpha = 0.2, width = 0.08) 
-
-wilcox.test(cor ~ is_dormant, data = inter_cor[which(inter_cor$timepoint == "diagnosis"),]) 
-```
--->
-
-## Intra-patient correlations
-
-#### Intra-status correlations
 
 ```{r}
 ggplot(all_cor, aes(x = is_dormant, y = cor)) + 
@@ -125,7 +148,7 @@ ggplot(all_cor, aes(x = days_treated, y = cor, colour = is_dormant)) +
 #### Intra-status & intra-timepoint correlations
 
 ```{r}
-timepoint_cor <- lapply(c("diagnosis", "on-treatment", "long-term"), function(timepoint){
+timepoint_cor <- lapply(timepoints, function(timepoint){
                             dfr <- corByStatus(dormset[, which(dormset$timepoint != timepoint)])
                             dfr$cor_comp <- factor(paste0(unique(dfr$timepoint), collapse = "-"),
                                                    levels = c("diagnosis-on-treatment", 
@@ -168,7 +191,7 @@ xpr <- melt(exprs(dormset))
 
 mrg <- merge(xpr, pheno, by.x = 'Var2', by.y = 'sample_id')
 
-mrg$timepoint <- factor(mrg$timepoint, levels = c("diagnosis", "on-treatment", "long-term"))
+mrg$timepoint <- factor(mrg$timepoint, levels = timepoints)
 
 ggplot(mrg[which(mrg$Var1 %in% c("MKI67", "MCM2", "PCNA")),], aes(x = timepoint, y = value)) +
     geom_boxplot() +
