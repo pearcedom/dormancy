@@ -1,0 +1,53 @@
+---
+
+---
+
+
+```{r}
+dir <- "../../lib/cam-functions/"
+files <- list.files(dir)
+
+source("../../lib/cam-functions/MDL.R")
+```
+
+
+#Subset samples for CAM
+
+```{r}
+dorm <- dormset[, which(dormset$is_dormant)] %>% exprs()
+dssn <- dormset[, which(!dormset$is_dormant)] %>% exprs()
+
+one <- dormset[, which(dormset$timepoint == "diagnosis")] %>% exprs()
+two <- dormset[, which(dormset$timepoint == "on-treatment")] %>% exprs()
+four <- dormset[, which(dormset$timepoint == "long-term")] %>% exprs()
+
+dorm1 <- dormset[, which(dormset$is_dormant & dormset$timepoint == "diagnosis")] %>% exprs()
+dorm2 <- dormset[, which(dormset$is_dormant & dormset$timepoint == "on-treatment")] %>% exprs()
+dorm4 <- dormset[, which(dormset$is_dormant & dormset$timepoint == "long-term")] %>% exprs()
+
+dssn1 <- dormset[, which(!dormset$is_dormant & dormset$timepoint == "diagnosis")] %>% exprs()
+dssn2 <- dormset[, which(!dormset$is_dormant & dormset$timepoint == "on-treatment")] %>% exprs()
+dssn4 <- dormset[, which(!dormset$is_dormant & dormset$timepoint == "long-term")] %>% exprs()
+
+#write.csv(four, "../output/cam-four.csv")
+```
+
+
+```{r}
+
+MDL <- function(X,S,A,K){
+        cat("Calculating MDL")
+       
+        L<-dim(X)[1]
+        data_size <- dim(X)[2]
+        likelihood <- (L*data_size)/2*log(var(as.vector(X-A%*%S)))
+        sigma <- var(as.vector(X-A%*%S))
+        penalty <- (K*L)/2*log(data_size)+(K*data_size)/2*log(L)
+        MDL <- likelihood+penalty
+       
+        return(list(MDL,likelihood,penalty,sigma))
+}
+
+
+
+```
