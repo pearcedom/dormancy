@@ -167,8 +167,10 @@ plotUnpaired <- function(x){
 
 
 ```{r, fig.width = 5.5}
-arrangeUnpairedGSEA(dormset, hallmarks) %>%
-    plotUnpaired()
+hallmarks_out <- arrangeUnpairedGSEA(dormset, hallmarks)
+
+hallmarks_out %>%
+        plotUnpaired()
 
 set.seed(125)
 arrangeUnpairedGSEA(dormset, cancersets) %>%
@@ -176,6 +178,10 @@ arrangeUnpairedGSEA(dormset, cancersets) %>%
         plotUnpaired() +
         scale_fill_gradient2(high = "#fe9929", mid = "white", low = "#4eb3d3", na.value = "white") + 
         facet_grid(direction~., scales = 'free', space = 'free')
+
+#Save the significant hallmark genesets for hallmark-heatmaps.Rmd
+hallmarks_out[!is.na(hallmarks_out$nes),]$hallmark %>%
+        writeLines("../output/hm-gsea-unpaired-all.txt")
 ```
 
 #### We can then split our dormant vs. desensitised comparison by timepoint
@@ -183,6 +189,9 @@ arrangeUnpairedGSEA(dormset, cancersets) %>%
 ```{r}
 lapply(c("diagnosis", "on-treatment", "long-term"), function(x) {
     dfr <- arrangeUnpairedGSEA(dormset[, which(dormset$timepoint == x)], hallmarks) 
+    #only run this the first time
+    dfr[!is.na(dfr$nes),]$hallmark %>%
+        writeLines(paste0("../output/hm-gsea-unpaired-", x,".txt"))
     dfr$timepoint <- factor(x, levels = c("diagnosis", "on-treatment", "long-term"))
     dfr
     }) %>% 
@@ -198,8 +207,9 @@ lapply(c("diagnosis", "on-treatment", "long-term"), function(x) {
 ```{r, fig.height = 17}
 lapply(c("diagnosis", "on-treatment", "long-term"), function(x) {
     dfr <- arrangeUnpairedGSEA(dormset[, which(dormset$timepoint == x)], cancersets) 
-    dfr$timepoint <- factor(x, levels = c("diagnosis", "on-treatment", "long-term"))
-    dfr
+    #we only need to run these lines the first time
+    #dfr$timepoint <- factor(x, levels = c("diagnosis", "on-treatment", "long-term"))
+    #dfr
     }) %>% 
     do.call(rbind, .) %>%
     ggplot(aes(x = timepoint, y = hallmark, fill = nes)) +
