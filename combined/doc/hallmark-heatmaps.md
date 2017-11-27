@@ -396,6 +396,7 @@ lapply(hm_long, function(x) {
 
 -   All samples
 -   *Maybe* G2M checkpoint differential expression in long-term samples
+-   Estrogen response early dampened in dssns
 -   MTORC long-term samples appear differentially regulated
 -   E2F targets
 -   EMT long-term samples have a region of *more* up-regulated expression as well as a loss of expression unshared in desensitiseds
@@ -404,3 +405,10 @@ lapply(hm_long, function(x) {
 -   Diagnostic samples
 -   Potential subtle differences in EMT here?
 -   Again, OXPHOS appears decreased in dssns
+-   On-treatment samples
+-   Pretty much nothing but this is kind of to be expected
+-   Long-term samples
+-   Potential difference in G2M checkpoint (which matches what was seen in the All Samples plot)
+-   Similarly potential differences in Adipogensis
+-   Again potential differences in MTORC as noted above
+-   And Glycolysis

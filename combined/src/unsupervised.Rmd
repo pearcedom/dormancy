@@ -31,6 +31,33 @@ pData(dormset)[dormset$patient == 343,]$is_dormant <- TRUE
 pData(dormset)[dormset$patient == 374,]$is_dormant <- TRUE
 ```
 
+```{r}
+## T-SNE playing 
+library(Rtsne)
+
+eset <- lt_500[, which(lt_500$timepoint == "long-term")]
+
+mtx <- eset %>% exprs() %>% t()
+set.seed(42) # Set a seed if you want reproducible results
+tsne_out <- Rtsne(mtx, perplexity = 27)$Y %>% data.frame(xpr_id = row.names(mtx))
+tsne_mrg <- merge(tsne_out, pData(eset), by = 'xpr_id')
+
+arng_dfr <- mdsArrange(exprs(eset))
+mrg_dfr <- merge(arng_dfr, pData(eset), by.x = 'ids', by.y = 'xpr_id')
+
+ggplot(tsne_mrg, aes(x = X1, y = X2, colour = is_dormant, label = sample_id)) + 
+        geom_text() + 
+        theme(legend.position = 'none')
+
+ggplot(mrg_dfr, aes(x = x, y = y, colour = patient)) + 
+    geom_point() 
+
+```
+
+
+
+
+
 #### as well as how well the are able to cluster patients based on dormancy status
 
 ```{r}
