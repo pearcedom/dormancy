@@ -132,7 +132,11 @@ arrangeGenesets <- function(GMT){
 
 ```{r}
 hallmarks <- getGmt("../data/h.all.v6.1.symbols.gmt") %>% arrangeGenesets()
-cancersets <- getGmt("../data/c6.all.v6.1.symbols.gmt") %>% arrangeGenesets()
+cancersets <- getGmt("../data/c6.all.v6.1.symbols.gmt") %>% 
+        arrangeGenesets()
+histsets <- getGmt("../data/c5.mf.v6.1.symbols.gmt") %>% 
+        arrangeGenesets() %>% 
+        .[grep("histone", names(.), ignore.case = TRUE)]
 ```
 
 #### We'll begin with an unpaired comparison, by arranging our data as two sets - dormants & desensitiseds - calculating the significant **NES** scores, and plotting.
@@ -165,13 +169,20 @@ plotUnpaired <- function(x){
 }
 ```
 
+### Plots
 
 ```{r, fig.width = 5.5}
+#hallmarks
 hallmarks_out <- arrangeUnpairedGSEA(dormset, hallmarks)
 
 hallmarks_out %>%
         plotUnpaired()
 
+#Save the significant hallmark genesets for hallmark-heatmaps.Rmd
+#hallmarks_out[!is.na(hallmarks_out$nes),]$hallmark %>%
+#       writeLines("../output/hm-gsea-unpaired-all.txt")
+
+#oncosets
 set.seed(125)
 arrangeUnpairedGSEA(dormset, cancersets) %>%
         .[!is.na(.$nes),] %>%
@@ -179,46 +190,42 @@ arrangeUnpairedGSEA(dormset, cancersets) %>%
         scale_fill_gradient2(high = "#fe9929", mid = "white", low = "#4eb3d3", na.value = "white") + 
         facet_grid(direction~., scales = 'free', space = 'free')
 
-#Save the significant hallmark genesets for hallmark-heatmaps.Rmd
-hallmarks_out[!is.na(hallmarks_out$nes),]$hallmark %>%
-        writeLines("../output/hm-gsea-unpaired-all.txt")
+#histsets
+arrangeUnpairedGSEA(dormset, histsets) %>% 
+        plotUnpaired() +
+        scale_fill_gradient2(high = "#fe9929", mid = "white", low = "#4eb3d3", na.value = "white")  
+
 ```
 
 #### We can then split our dormant vs. desensitised comparison by timepoint
 
 ```{r}
-lapply(c("diagnosis", "on-treatment", "long-term"), function(x) {
-    dfr <- arrangeUnpairedGSEA(dormset[, which(dormset$timepoint == x)], hallmarks) 
-    #only run this the first time
-    dfr[!is.na(dfr$nes),]$hallmark %>%
-        writeLines(paste0("../output/hm-gsea-unpaired-", x,".txt"))
-    dfr$timepoint <- factor(x, levels = c("diagnosis", "on-treatment", "long-term"))
-    dfr
-    }) %>% 
-    do.call(rbind, .) %>%
-    ggplot(aes(x = timepoint, y = hallmark, fill = nes)) +
-        geom_tile(colour = "#f0f0f0") + 
-        scale_fill_gradientn(values=c(1, .7, .5, .3, 0), colours=rev(c("#4eb3d3", "#a8ddb5", "white", "#fee391", "#fe9929")), na.value = "white") +
-        #facet_wrap(~timepoint, nrow = 1) +
-        labs(title = "Hallmark genesets") + 
-        theme_pander()
+plotUnpairedSplit <- function(geneset){ 
+        lapply(c("diagnosis", "on-treatment", "long-term"), function(x) {
+        dfr <- arrangeUnpairedGSEA(dormset[, which(dormset$timepoint == x)], geneset) 
+        dfr$timepoint <- factor(x, levels = c("diagnosis", "on-treatment", "long-term"))
+        dfr[!is.na(dfr$nes),]$hallmark %>%
+                writeLines(paste0("../output/hm-gsea-unpaired-", x, ".txt"))
+        dfr
+        }) %>% 
+        do.call(rbind, .) %>%
+        ggplot(aes(x = timepoint, y = hallmark, fill = nes)) +
+            geom_tile(colour = "#f0f0f0") + 
+            scale_fill_gradientn(values=c(1, .7, .5, .3, 0), colours=rev(c("#4eb3d3", "#a8ddb5", "white", "#fee391", "#fe9929")), na.value = "white") +
+            labs(title = "Hallmark genesets") 
+} 
+
+plotUnpairedSplit(hallmarks)
 ```
 
 ```{r, fig.height = 17}
-lapply(c("diagnosis", "on-treatment", "long-term"), function(x) {
-    dfr <- arrangeUnpairedGSEA(dormset[, which(dormset$timepoint == x)], cancersets) 
-    #we only need to run these lines the first time
-    #dfr$timepoint <- factor(x, levels = c("diagnosis", "on-treatment", "long-term"))
-    #dfr
-    }) %>% 
-    do.call(rbind, .) %>%
-    ggplot(aes(x = timepoint, y = hallmark, fill = nes)) +
-        geom_tile(colour = "#f0f0f0") + 
-        scale_fill_gradientn(values=c(1, .7, .5, .3, 0), colours=rev(c("#4eb3d3", "#a8ddb5", "white", "#fee391", "#fe9929")), na.value = "white") +
-        #facet_wrap(~timepoint, nrow = 1) +
-        labs(title = "Hallmark genesets") + 
-#        theme_pander() +
+plotUnpairedSplit(cancersets) +
         facet_grid(direction~., scales = 'free', space = 'free')
+```
+
+```{r}
+plotUnpairedSplit(histsets) + 
+        scale_fill_gradient2(high = "#fe9929", mid = "white", low = "#4eb3d3", na.value = "white")  
 ```
 
 #### Now we'll take advantage of our paired data and look at fold change overtime, separtely for dormant and desensitised patients

@@ -38,34 +38,30 @@ heatmapPlot <- function(eset, geneset, title){
         fill_max <- range(mrg_dfr$value) %>% abs() %>% max()
 
         #plot
-        #p_hmap <- 
-                ggplot(mrg_dfr, aes(x = ordered_samples, y = row_value, fill = value)) +
+        p_hmap <- ggplot(mrg_dfr, aes(x = ordered_samples, y = row_value, fill = value)) +
                         geom_tile() + 
                         #scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850') +
                         scale_fill_gradientn(values=c(1, .7, .5, .3, 0), 
-                                             colours=c("#fb6a4a", 
-                                                           "#cb181d", 
-                                                           "black", 
-                                                           "#238b45", 
-                                                           "#74c476"), 
+                                             colours=c("#fb6a4a", "#cb181d", "black", 
+                                                       "#238b45", "#74c476"), 
                                              limits = c(-fill_max, fill_max),
                                              na.value = "white") +
-
-                        facet_grid(is_dormant~timepoint, scales = 'free_x', space = 'free') + 
+                        facet_grid(~is_dormant, scales = 'free_x', space = 'free') + 
                         labs(title = title) +
                         theme(
                               axis.text.x = element_blank(),
                               axis.ticks.x = element_blank()
                               )
 
-        #p_bar <- ggplot(mrg_dfr, aes(x = variable, y = "Status", fill = is_dormant)) +
-        #                geom_tile() +
-        #                theme(
-        #                      axis.text.x = element_blank(),
-        #                      axis.ticks.x = element_blank()
-        #                      ) + 
-        #                labs(title = title)
-        #plot_grid(p_bar, p_hmap, ncol = 1, align = 'v', rel_heights = c(1, 8))
+        p_bar <- ggplot(mrg_dfr, aes(x = ordered_samples, y = days_treated, colour = timepoint)) +
+                        geom_point() + 
+                        theme(
+                              axis.text.x = element_blank(),
+                              axis.ticks.x = element_blank()
+                              ) + 
+                        facet_grid(~is_dormant, scales = 'free_x', space = 'free')
+                        labs(title = title)
+        plot_grid(p_bar, p_hmap, ncol = 1, align = 'v', rel_heights = c(1, 5))
 }
 ```
 
@@ -75,7 +71,6 @@ heatmapPlot <- function(eset, geneset, title){
 lapply(hm_all, function(x) heatmapPlot(dormset, hallmarks[[x]], x))
 ```
 
-    ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
@@ -118,34 +113,49 @@ lapply(hm_all, function(x) heatmapPlot(dormset, hallmarks[[x]], x))
 
 <img src="hallmark-heatmaps_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-5-7.png" style="display: block; margin: auto;" />
 
-    ## 
-    ## [[8]]
-
-<img src="hallmark-heatmaps_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-5-8.png" style="display: block; margin: auto;" />
-
 #### Diagnostic comparisons
 
 ``` r
 lapply(hm_diagnosis, function(x) {
+               print(x)
                eset <- dormset[, which(dormset$timepoint == "diagnosis")]
                heatmapPlot(eset, hallmarks[[x]], x)
       })
 ```
 
+    ## [1] "HALLMARK_HYPOXIA"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_IL6_JAK_STAT3_SIGNALING"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_ESTROGEN_RESPONSE_EARLY"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_ESTROGEN_RESPONSE_LATE"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_MYOGENESIS"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_PROTEIN_SECRETION"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_MYC_TARGETS_V1"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_MYC_TARGETS_V2"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_OXIDATIVE_PHOSPHORYLATION"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_UV_RESPONSE_UP"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_UV_RESPONSE_DN"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_ANGIOGENESIS"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_COAGULATION"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_KRAS_SIGNALING_UP"
+    ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_KRAS_SIGNALING_DN"
+    ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "HALLMARK_PANCREAS_BETA_CELLS"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
 
     ## [[1]]
@@ -222,6 +232,16 @@ lapply(hm_diagnosis, function(x) {
 
 <img src="hallmark-heatmaps_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-6-15.png" style="display: block; margin: auto;" />
 
+    ## 
+    ## [[16]]
+
+<img src="hallmark-heatmaps_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-6-16.png" style="display: block; margin: auto;" />
+
+    ## 
+    ## [[17]]
+
+<img src="hallmark-heatmaps_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-6-17.png" style="display: block; margin: auto;" />
+
 #### On-treatment comparisons
 
 ``` r
@@ -231,6 +251,8 @@ lapply(hm_on, function(x) {
       })
 ```
 
+    ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
+    ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
     ## [1] "scale_fill_gradient2 reminder : scale_fill_gradient2(high = '#d73027', mid = 'black', low = '#1a9850')"
@@ -248,6 +270,16 @@ lapply(hm_on, function(x) {
     ## [[3]]
 
 <img src="hallmark-heatmaps_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-7-3.png" style="display: block; margin: auto;" />
+
+    ## 
+    ## [[4]]
+
+<img src="hallmark-heatmaps_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-7-4.png" style="display: block; margin: auto;" />
+
+    ## 
+    ## [[5]]
+
+<img src="hallmark-heatmaps_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-7-5.png" style="display: block; margin: auto;" />
 
 #### Long-term comparisons
 
@@ -359,3 +391,16 @@ lapply(hm_long, function(x) {
     ## [[17]]
 
 <img src="hallmark-heatmaps_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-8-17.png" style="display: block; margin: auto;" />
+
+#### From those many, *many* heatmaps, signatures that appear interesting are:
+
+-   All samples
+-   *Maybe* G2M checkpoint differential expression in long-term samples
+-   MTORC long-term samples appear differentially regulated
+-   E2F targets
+-   EMT long-term samples have a region of *more* up-regulated expression as well as a loss of expression unshared in desensitiseds
+-   OXPHOS **early** samples express these genes less in desensitiseds - very interesting...
+-   Especially when combined with a seeming lack of loss in Glycolysis genes at long-term in dssn
+-   Diagnostic samples
+-   Potential subtle differences in EMT here?
+-   Again, OXPHOS appears decreased in dssns
