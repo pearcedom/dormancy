@@ -17,26 +17,29 @@ uss_dfr$Status <- factor(ifelse(uss_dfr$is_dormant, "Dormant", "Desensitised"),
                              levels = c("Dormant", "Desensitised"))
 
 x <- 650
-rmote::rmote_device(height = 0.5*x, width = 2*x)
+rmote::rmote_device(height = 1.15*x, width = 2*x)
 ggplot(uss_dfr, aes(x = days_treated, 
                     y = relative_vol)) + 
     geom_vline(xintercept = 120, linetype = 3) + 
     geom_hline(yintercept = 60, linetype = 3) + 
     geom_line(aes(group = patient_id, 
-                  colour = Status)) + 
-#    geom_smooth(colour = "#525252", se = FALSE) + 
+                  colour = Status),
+              size = 1) + 
     scale_y_continuous(breaks = c(0, 60, 100, 200)) +
     scale_x_continuous(breaks = c(0, 120, 120, 500, 1000)) +
     scale_colour_manual(values = c("#6baed6", "#ef6548")) +
-    labs(y = "Relative Tumour Volume",
+    labs(title = "USS Classification",
+         y = "Relative Tumour Volume",
          x = "Days Treated") + 
+    
     theme_pander() +
     theme(legend.position = 'none',
-          axis.text = element_text(size = 14),
-          axis.title.x = element_text(size = 17),
-          axis.title.y = element_text(size = 17),
+          plot.title = element_text(size = 33),
+          axis.text = element_text(size = 18),
+          axis.title.x = element_text(size = 21),
+          axis.title.y = element_text(size = 21),
           panel.spacing.x = unit(1.45, "lines"),
-          strip.text.x = element_text(size = 17)
+          strip.text.x = element_text(size = 21)
           ) + 
     facet_wrap(~Status, ncol = 2) + 
     coord_cartesian(c(0, 250), c(0, 150))
@@ -57,19 +60,23 @@ st_dfr$Treatment <- ifelse(st_dfr$timepoint == "diagnosis", "Pre-",
         factor(levels = rev(c("Pre-", "Early-on", "Long-term")))
 
 x <- 150
-rmote::rmote_device(height = 1*x, width = 10*x)
+rmote::rmote_device(height = 4*x, width = 10*x)
 ggplot(st_dfr, aes(x = patient_ord, y = Treatment, fill = pred)) + 
     geom_tile(width = 1, colour = "WHITE") + 
     scale_fill_manual(values=c("#1f78b4", "#a6cee3", "#fb9a99", "#e31a1c", "#b2df8a"), 
                     limits=c("LumA", "LumB", "Her2", "Basal", "Normal")) +
     facet_grid(~is_dormant, scales = 'free', space = 'free') +
-    labs(fill = "PAM50 Subtype") + 
+    labs(title = "Subtype Assignment", fill = "PAM50 Subtype") + 
     ggthemes::theme_pander() + 
-    theme(axis.title.x = element_blank(),
+    theme(plot.title = element_text(size = 34),
+          axis.title.x = element_blank(),
           axis.text.x = element_blank(),
           axis.ticks.x = element_blank(),
-          axis.text.y = element_text(size = 10),
+          axis.text.y = element_text(size = 20),
+          axis.title.y = element_text(size = 23),
+          strip.text.x = element_text(size = 20),
           panel.spacing.x = unit(1.45, "lines"),
+          legend.text=element_text(size=20),
           legend.position = "bottom")
 
 ```
@@ -94,7 +101,7 @@ ggplot(hm_dfr, aes(x = Treatment, y = hallmark, fill = nes)) +
     scale_fill_gradientn(values=c(1, .7, .5, .3, 0), colours=rev(c("#4eb3d3", "#a8ddb5", "white", "#fee391", "#fe9929")), na.value = "white") +
     facet_wrap(~Treatment, nrow = 1, scales = 'free_x') +
     labs(title = "Hallmark GSEA", 
-         subtitle = "Enrichment is relative to\ndesensitised patients",
+         subtitle = "note: enrichment is relative to desensitised patients",
          x = "Treatment timepoint",
          fill = "Normalised\nenrichment"
          ) + 
