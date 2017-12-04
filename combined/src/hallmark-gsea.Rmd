@@ -38,11 +38,18 @@ dormset <- read_rds("../output/dormset.rds")
 
 ```{r}
 getFC <- function(eset, id1, id2, id_col, patient_col){
+    #grab samples specific to each comparison
     intset <- eset[, which(pData(eset)[[id_col]] == id1 | pData(eset)[[id_col]] == id2)]
+    #then check if any of the patients have only 1 samples (i.e. are impossible to calculate FC for)
     singles <- table(intset[[patient_col]]) %>% .[.==1] %>% names()
+    #and remove if so
     fcset <- intset[, -which(intset[[patient_col]] %in% singles)]
+    #separate into class specific sets and order by column names (which should ensure they're in the same relative order)
     a_set <- fcset[, fcset[[id_col]] == id1]
     b_set <- fcset[, fcset[[id_col]] == id2]
+    a_ord <- a_set[, order(colnames(a_set))]
+    b_ord <- b_set[, order(colnames(b_set))]
+    #subtract to calculate FC
     exprs(b_set) - exprs(a_set)
 }
 ```
