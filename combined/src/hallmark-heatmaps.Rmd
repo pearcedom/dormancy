@@ -17,13 +17,17 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align =
 library(tidyverse)
 library(Biobase)
 library(GSEABase)
+library(broom)
 library(cowplot); theme_set(theme_grey())
 source("../../lib/arrangeGSEAGenesets.R")
 source("../../../../functions/library/heatmapArrange.R")
 ```
 
 ```{r}
-dormset <- read_rds("../output/dormset.rds")
+dormset_base <- read_rds("../output/dormset.rds")
+dormset <- dormset_base[, which(!is.na(dormset_base$timepoint) & !is.na(dormset_base$is_dormant))]
+pData(dormset)[dormset$patient == 343,]$is_dormant <- TRUE
+pData(dormset)[dormset$patient == 374,]$is_dormant <- TRUE
 hallmarks <- getGmt("../data/h.all.v6.1.symbols.gmt") %>% arrangeGenesets(dormset)
 
 #Significant hallmarks for various comparisons
@@ -36,15 +40,22 @@ hm_long <- readLines("../output/hm-gsea-unpaired-long-term.txt")
 #### Here we're looking to take a geneset that we've determined as informative in _hallmarks-gsea.Rmd_ and display the per-sample expression as a heatmap.
 
 ```{r}
-heatmapPlot <- function(eset, geneset, title){
+heatmapOrganise <- function(eset, geneset, geneset_name){
         #arrange
         esub <- eset[geneset,]
         dfr <- heatmapArrange(exprs(esub), cluster_row = TRUE, cluster_column = FALSE)
         mrg_dfr <- merge(dfr, pData(esub), by.x = 'variable', by.y = 'xpr_id')
         ord_levels <- unique(mrg_dfr$variable[order(mrg_dfr$days_treated)])
         mrg_dfr$ordered_samples <- factor(mrg_dfr$variable, levels = ord_levels)
-        fill_max <- range(mrg_dfr$value) %>% abs() %>% max()
+        mrg_dfr$timepoint <- factor(mrg_dfr$timepoint, levels = c("diagnosis", 
+                                                                  "on-treatment",
+                                                                  "long-term"))
+        mrg_dfr$geneset <- geneset_name
+        mrg_dfr
+}
 
+heatmapPlot <- function(mrg_dfr, title){
+        fill_max <- range(mrg_dfr$value) %>% abs() %>% max()
         #plot
         p_hmap <- ggplot(mrg_dfr, aes(x = ordered_samples, y = row_value, fill = value)) +
                         geom_tile() + 
@@ -62,7 +73,7 @@ heatmapPlot <- function(eset, geneset, title){
                               )
 
         p_bar <- ggplot(mrg_dfr, aes(x = ordered_samples, y = days_treated, colour = timepoint)) +
-                        geom_point() + 
+                        geom_point(size = 0.5) + 
                         theme(
                               axis.text.x = element_blank(),
                               axis.ticks.x = element_blank()
@@ -76,16 +87,19 @@ heatmapPlot <- function(eset, geneset, title){
 #### All sample comparisons
 
 ```{r}
-lapply(hm_all, function(x) heatmapPlot(dormset, hallmarks[[x]], x))
+lapply(hm_all, function(x){
+        heatmapOrganise(dormset, hallmarks[[x]], x) %>%
+                heatmapPlot(x)
+      })
 ```
 
 #### Diagnostic comparisons
 
 ```{r}
 lapply(hm_diagnosis, function(x) {
-               print(x)
                eset <- dormset[, which(dormset$timepoint == "diagnosis")]
-               heatmapPlot(eset, hallmarks[[x]], x)
+               heatmapOrganise(eset, hallmarks[[x]], x) %>%
+                       heatmapPlot(x)
       })
 ```
 
@@ -94,7 +108,8 @@ lapply(hm_diagnosis, function(x) {
 ```{r}
 lapply(hm_on, function(x) {
                eset <- dormset[, which(dormset$timepoint == "on-treatment")]
-               heatmapPlot(eset, hallmarks[[x]], x)
+               heatmapOrganise(eset, hallmarks[[x]], x) %>%
+                       heatmapPlot(x)
       })
 ```
 
@@ -103,28 +118,61 @@ lapply(hm_on, function(x) {
 ```{r}
 lapply(hm_long, function(x) {
                eset <- dormset[, which(dormset$timepoint == "long-term")]
-               heatmapPlot(eset, hallmarks[[x]], x)
+               heatmapOrganise(eset, hallmarks[[x]], x) %>%
+                       heatmapPlot(x)
       })
 ```
 
 
 #### From those many, *many* heatmaps, signatures that appear interesting are:
-- All samples
-  - *Maybe* G2M checkpoint differential expression in long-term samples
-  - Estrogen response early dampened in dssns
-  - MTORC long-term samples appear differentially regulated
-  - E2F targets
-  - EMT long-term samples have a region of *more* up-regulated expression as well as a loss of expression 
-    unshared in desensitiseds
-  - OXPHOS **early** samples express these genes less in desensitiseds - very interesting...
-  - Especially when combined with a seeming lack of loss in Glycolysis genes at long-term in dssn
-- Diagnostic samples
-  - Potential subtle differences in EMT here?
-  - Again, OXPHOS appears decreased in dssns
-- On-treatment samples
-  - Pretty much nothing but this is kind of to be expected
-- Long-term samples
-  - Potential difference in G2M checkpoint (which matches what was seen in the All Samples plot)
-  - Similarly potential differences in Adipogensis
-  - Again potential differences in MTORC as noted above
-  - And Glycolysis
+#- All samples
+#  - *Maybe* G2M checkpoint differential expression in long-term samples
+#  - Estrogen response early dampened in dssns
+#  - MTORC long-term samples appear differentially regulated
+#  - E2F targets
+#  - EMT long-term samples have a region of *more* up-regulated expression as well as a loss of expression 
+#    unshared in desensitiseds
+#  - OXPHOS **early** samples express these genes less in desensitiseds - very interesting...
+#  - Especially when combined with a seeming lack of loss in Glycolysis genes at long-term in dssn
+#- Diagnostic samples
+#  - Potential subtle differences in EMT here?
+#  - Again, OXPHOS appears decreased in dssns
+#- On-treatment samples
+#  - Pretty much nothing but this is kind of to be expected
+#- Long-term samples
+#  - Potential difference in G2M checkpoint (which matches what was seen in the All Samples plot)
+#  - Similarly potential differences in Adipogensis
+#  - Again potential differences in MTORC as noted above
+#  - And Glycolysis
+
+```{r}
+pariedBoxplot <- function(dfr, title, orientation = 1){
+
+        p <- lapply(unique(dfr$geneset), function(geneset){
+                            set_dfr <- dfr[dfr$geneset == geneset,] 
+                            sapply(c(TRUE, FALSE), function(status){
+                                           sub_dfr <- set_dfr[set_dfr$is_dormant == status,]
+                                           aov_dfr <- aov(value ~ timepoint, data = sub_dfr) %>%
+                                                   tidy()
+                                           aov_dfr$p.value[[1]]
+                                   })
+                    })
+
+        ggplot(dfr, aes_string(x = ifelse(orientation == 1, "timepoint", "is_dormant"),
+                               y = "value",
+                               fill = ifelse(orientation == 1, "is_dormant", "timepoint"))) +
+                geom_boxplot(notch = TRUE) + 
+                facet_wrap(~geneset, ncol = 7) + 
+                labs(subtitle = paste0("Dormant p = ", p[1]))
+}
+```
+
+
+```{r}
+lapply(hm_all, function(x){
+        heatmapOrganise(dormset, hallmarks[[x]], x) 
+      }) %>% 
+        do.call(rbind, .) %>%
+        pariedBoxplot(x, orientation = 2)
+```
+

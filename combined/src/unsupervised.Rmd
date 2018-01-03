@@ -18,11 +18,14 @@ library(cowplot); theme_set(theme_grey())
 source("/Volumes/igmm/sims-lab/Dominic/functions/idReplace.R")
 source("/Volumes/igmm/sims-lab/Dominic/functions/mostVar.R")
 source("/Volumes/igmm/sims-lab/Dominic/functions/library/mdsArrange.R")
+source("/Volumes/igmm/sims-lab/Dominic/functions/library/tsneArrange.R")
 ```
 
 
 <!--
 //TODO try using only A, B, C samples to see if they sit close to one another
+
+//TODO you were in the middle of t-sneifying but when you're running the first implementation since you added the perplexity argument the plot looks different each time
 -->
 
 ```{r}
@@ -33,18 +36,16 @@ pData(dormset)[dormset$patient == 374,]$is_dormant <- TRUE
 
 ```{r}
 ## T-SNE playing 
-library(Rtsne)
-
-eset <- lt_500[, which(lt_500$timepoint == "long-term")]
-
-mtx <- eset %>% exprs() %>% t()
-set.seed(42) # Set a seed if you want reproducible results
-tsne_out <- Rtsne(mtx, perplexity = 27)$Y %>% data.frame(xpr_id = row.names(mtx))
-tsne_mrg <- merge(tsne_out, pData(eset), by = 'xpr_id')
+eset <- lt_500#[, which(lt_500$timepoint == "long-term")]
 
 arng_dfr <- mdsArrange(exprs(eset))
 mrg_dfr <- merge(arng_dfr, pData(eset), by.x = 'ids', by.y = 'xpr_id')
 
+mtx <- eset %>% exprs() %>% t()
+set.seed(42) # Set a seed if you want reproducible results
+
+tsne_out <- tsneArrange(mtx)
+tsne_mrg <- merge(tsne_out, pData(eset), by = 'xpr_id')
 ggplot(tsne_mrg, aes(x = X1, y = X2, colour = is_dormant, label = sample_id)) + 
         geom_text() + 
         theme(legend.position = 'none')
@@ -61,29 +62,30 @@ ggplot(mrg_dfr, aes(x = x, y = y, colour = patient)) +
 #### as well as how well the are able to cluster patients based on dormancy status
 
 ```{r}
-plotMDS <- function(eset, time_point = "all", title = ""){
+plotSNE <- function(eset, time_point = "all", title = "", perplexity = 30){
     if(time_point[[1]] != "all"){
                eset_in = eset[, which(eset$timepoint %in% time_point)]
            } else {
                eset_in = eset 
            }
-           arng_dfr <- mdsArrange(exprs(eset_in))
-           mrg_dfr <- merge(arng_dfr, pData(eset_in), by.x = 'ids', by.y = 'xpr_id')
+    arng_dfr <- tsneArrange(t(exprs(eset_in)), perplexity = perplexity)
+    mrg_dfr <- merge(arng_dfr, pData(eset_in), by = 'xpr_id')
+    
+    p_sne <- ggplot(mrg_dfr, aes(x = X1, y = X2, colour = is_dormant, label = sample_id)) + 
+        geom_text() + 
+        labs(title = title,
+             subtitle = paste0("x separation p = ", 
+                               wilcox.test(X1~is_dormant, data = mrg_dfr)$p.value)) +
+        theme_pander() +
+        theme(legend.position = 'top')
 
-           p_mds <- ggplot(mrg_dfr, aes(x = x, y = y, colour = is_dormant, size = 2.1)) + 
-               geom_point() + 
-               labs(title = title,
-                    subtitle = paste0("x separation p = ", 
-                                      wilcox.test(x~is_dormant, data = mrg_dfr)$p.value)) +
-               theme_pander() +
-               theme(legend.position = 'top')
-
-           p_box <- ggplot(mrg_dfr, aes(x = is_dormant, y = x, fill = is_dormant)) + 
-               geom_boxplot(notch = TRUE) + 
-               coord_flip() + 
-               theme_pander() + 
-               theme(legend.position = 'none')
-           plot_grid(p_mds, p_box, rel_heights = c(3, 1), ncol = 1)
+    p_sne
+#    p_box <- ggplot(mrg_dfr, aes(x = is_dormant, y = X1, fill = is_dormant)) + 
+#        geom_boxplot(notch = TRUE) + 
+#        coord_flip() + 
+#        theme_pander() + 
+#        theme(legend.position = 'none')
+#    plot_grid(p_mds, p_box, rel_heights = c(3, 1), ncol = 1)
 }
 ```
 
@@ -115,49 +117,49 @@ preu_173 <- dormset[pre_unique, ]
 ### Long-term 500
 
 ```{r}
-plotMDS(lt_500, 'all', 'All Samples')
-plotMDS(lt_500, c('on-treatment', 'long-term'), 'Treated Samples')
-plotMDS(lt_500, 'long-term', 'Long-term Samples')
-plotMDS(lt_500, 'on-treatment', 'On-treatment Samples')
-plotMDS(lt_500, 'diagnosis', 'Diagnostic Samples')
+plotSNE(lt_500, 'all', 'All Samples')
+plotSNE(lt_500, c('on-treatment', 'long-term'), 'Treated Samples')
+plotSNE(lt_500, 'long-term', 'Long-term Samples')
+plotSNE(lt_500, 'on-treatment', 'On-treatment Samples')
+plotSNE(lt_500, 'diagnosis', 'Diagnostic Samples')
 ```
 
 ### Pre-treatment 500
 
 ```{r}
-plotMDS(pre_500, 'all', 'All Samples')
-plotMDS(pre_500, c('on-treatment', 'long-term'), 'Treated Samples')
-plotMDS(pre_500, 'long-term', 'Long-term Samples')
-plotMDS(pre_500, 'on-treatment', 'On-treatment Samples')
-plotMDS(pre_500, 'diagnosis', 'Diagnostic Samples')
+plotSNE(pre_500, 'all', 'All Samples')
+plotSNE(pre_500, c('on-treatment', 'long-term'), 'Treated Samples')
+plotSNE(pre_500, 'long-term', 'Long-term Samples')
+plotSNE(pre_500, 'on-treatment', 'On-treatment Samples')
+plotSNE(pre_500, 'diagnosis', 'Diagnostic Samples')
 ```
 
 ### Intersect 327
 
 ```{r}
-plotMDS(common_327, 'all', 'All Samples')
-plotMDS(common_327, c('on-treatment', 'long-term'), 'Treated Samples')
-plotMDS(common_327, 'long-term', 'Long-term Samples')
-plotMDS(common_327, 'on-treatment', 'On-treatment Samples')
-plotMDS(common_327, 'diagnosis', 'Diagnostic Samples')
+plotSNE(common_327, 'all', 'All Samples')
+plotSNE(common_327, c('on-treatment', 'long-term'), 'Treated Samples')
+plotSNE(common_327, 'long-term', 'Long-term Samples')
+plotSNE(common_327, 'on-treatment', 'On-treatment Samples')
+plotSNE(common_327, 'diagnosis', 'Diagnostic Samples')
 ```
 
 ### Long-term unique 173
 
 ```{r}
-plotMDS(ltu_173, 'all', 'All Samples')
-plotMDS(ltu_173, c('on-treatment', 'long-term'), 'Treated Samples')
-plotMDS(ltu_173, 'long-term', 'Long-term Samples')
-plotMDS(ltu_173, 'on-treatment', 'On-treatment Samples')
-plotMDS(ltu_173, 'diagnosis', 'Diagnostic Samples')
+plotSNE(ltu_173, 'all', 'All Samples')
+plotSNE(ltu_173, c('on-treatment', 'long-term'), 'Treated Samples')
+plotSNE(ltu_173, 'long-term', 'Long-term Samples')
+plotSNE(ltu_173, 'on-treatment', 'On-treatment Samples')
+plotSNE(ltu_173, 'diagnosis', 'Diagnostic Samples')
 ```
 
 ### Pre-treatment unique 173
 
 ```{r}
-plotMDS(preu_173, 'all', 'All Samples')
-plotMDS(preu_173, c('on-treatment', 'long-term'), 'Treated Samples')
-plotMDS(preu_173, 'long-term', 'Long-term Samples')
-plotMDS(preu_173, 'on-treatment', 'On-treatment Samples')
-plotMDS(preu_173, 'diagnosis', 'Diagnostic Samples')
+plotSNE(preu_173, 'all', 'All Samples')
+plotSNE(preu_173, c('on-treatment', 'long-term'), 'Treated Samples')
+plotSNE(preu_173, 'long-term', 'Long-term Samples')
+plotSNE(preu_173, 'on-treatment', 'On-treatment Samples')
+plotSNE(preu_173, 'diagnosis', 'Diagnostic Samples')
 ```
