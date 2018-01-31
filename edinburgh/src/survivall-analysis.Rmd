@@ -1,0 +1,75 @@
+
+---
+title: Dormancy survivALL
+author: Dominic Pearce
+output: github_document
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
+```
+
+Cigdem gave me an eset and some genes and wanted survivALL plots, so...
+
+```{r}
+library(survivALL)
+library(tidyverse)
+library(cowplot); theme_set(theme_grey())
+
+checkContSig <- function(probe, eset, time_col, event_col){
+    library(survival)
+    xpr_mtx <- exprs(eset)
+    srv_dfr <- pData(eset)
+    srv_obj <- Surv(srv_dfr[[time_col]], srv_dfr[[event_col]])
+    Class <- xpr_mtx[probe,] 
+    broom::tidy(coxph(srv_obj ~ Class))$p.value
+}
+```
+
+```{r}
+eset <- readRDS("../data/1_Dorm_pfq_3cat_hgnc.Rds")
+geneset <- c("S100P", "H2AFZ", "HDAC11", "HIST2H3A", "HIST1H2AE", "HIST1H2BD", "HIST1H3B")
+```
+
+Make survival data numeric and subset by complete event and time information
+
+```{r}
+eset$e.recur <- as.numeric(eset$recur.status)
+eset$t.recur <- as.numeric(eset$timetorec_v2)
+
+srvset <- eset[, which(!is.na(eset$e.recur) & !is.na(eset$t.recur))]
+```
+
+Because survivALL performs lots of tests, we first check each gene is significant using the gene expression as a continuous variable. *If* it is, then we investigate it in more detail, visualising the HR distribution etc.
+
+```{r}
+continuous_dfr <- sapply(geneset, function(gene){
+    checkContSig(gene, srvset, "t.recur", "e.recur")
+}) %>% data.frame(p = .)
+continuous_dfr$is_sig <- continuous_dfr$p < 0.05
+
+knitr::kable(continuous_dfr)
+```
+
+**HIST1H2BD** is the only gene that fails this first step - we'll include it still for the next step as you may be interested in the HR distribution despite it not being (reliably) significant but be careful not to read too much into this gene in particular. 
+
+```{r, fig.height = 7}
+plot_lst <- lapply(geneset, function(gene){
+    plotALL(measure = exprs(srvset)[gene,],
+            srv = pData(srvset),
+            time = "t.recur",
+            event = "e.recur", 
+            title = gene)
+})
+
+plot_grid(plotlist = plot_lst, ncol = 2)
+```
+
+Unsurprisingly, as all genes (save one) passed the first significance test above, the HR distributions show large ranges of significance. **HIST1H2BD** does show some significant points but not many and continues to be a *maybe*. All genes with significant HRs consistently above the 0 line  are associated with worse prognosis at higher levels of expression of that particular gene. This is the case for all genes except for **HDAC11**, which is associated with better prognosis at increased levels of expression.   
+
+
+
+
+
+
+
