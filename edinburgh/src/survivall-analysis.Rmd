@@ -1,4 +1,3 @@
-
 ---
 title: Dormancy survivALL
 author: Dominic Pearce

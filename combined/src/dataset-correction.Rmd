@@ -25,8 +25,7 @@ library(tidyverse)
 library(Biobase)
 library(sva)
 library(testthat)
-source("/Volumes/igmm/sims-lab/Dominic/functions/idReplace.R")
-source("/Volumes/igmm/sims-lab/Dominic/functions/convert-id-to-gene-symbol-with-biomart.R")
+library(transcripTools)
 ```
 
 #### Now we have the two dormancy datasets - Edinburgh & Georgetown - pre-processed and ready to analyse. In addition to their independent analysis, we'll also want to pool all samples into a single dataset for maximum power. **However**, having been pre-processed months apart, in different countries and by different people, before combining we first need to make sure their clinical data is analogous.
@@ -123,6 +122,8 @@ buildeSet <- function(xpr, pheno){
                   )
 }
 dormset <- buildeSet(dorm_xpr, dorm_pheno)
+
+#write_rds(dormset, "../output/dormset-raw.rds")
 ```
 
 #### Now we check for batch differences, correct using ComBat and validate our approach using the samples which are replicated between the two datasets.
@@ -140,6 +141,7 @@ batchEffectMDS(dormset, "platform")
 ```{r}
 dorm_cb <- ComBat(exprs(dormset), batch = dormset$platform)
 dormset_cb <- buildeSet(dorm_cb, pData(dormset))
+#write_rds(dormset_cb, "../output/dormset-cb.rds")
 
 batchEffectDists(dormset_cb, "platform")
 batchEffectMDS(dormset_cb, "platform")

@@ -44,6 +44,7 @@ source("../../../../functions/library/mdsArrange.R")
     #boxplot
     p_box <- ggplot(george_mrg, aes(x = Var2, y = value, fill = is_freshfrozen)) + 
         geom_boxplot() +
+        labs(y = "log2 Expression", x = "Sample", fill = "Material")
         theme(legend.position = 'bottom',
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank())
@@ -51,6 +52,7 @@ source("../../../../functions/library/mdsArrange.R")
     #densityplot
     p_dist <- ggplot(george_mrg, aes(x = value, colour = is_freshfrozen, group = Var2), alpha = 0.05) + 
         geom_line(stat = 'density', alpha = 0.2) + 
+        labs(y = "Density", x = "log2 Expression", colour = "Material")
         theme_pander() +    
         theme(legend.position = 'bottom',
             axis.ticks.x = element_blank(),
@@ -91,7 +93,10 @@ cowplot::plot_grid(plotlist = plot_lst, ncol = 3)
 #### And as it's perhaps the most likely source of biological variation, we'll plot biopsy number a little larger
 
 ```{r}
-batchEffectMDS(exprs(georgeset), "timepoint")
+batchEffectMDS(exprs(georgeset), "timepoint") +
+    geom_point(aes(pch = is_freshfrozen)) + 
+    scale_shape_manual(values = c(16, 15)) + 
+    scale_colour_manual(values = c("#6baed6", "#fdae6b", "#fb6a4a"))
 ```
 
 ### Correction and post-correction
@@ -243,5 +248,3 @@ c(technicalreps_toremove, materialreps_toremove) %>%
     sort() %>% 
     cat(sep = "\n")
 ```
-
-

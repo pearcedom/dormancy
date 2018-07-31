@@ -1,5 +1,5 @@
 ---
-title: 
+title: USS characterisation
 author: Dominic Pearce
 output:
     github_document
@@ -9,83 +9,94 @@ output:
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
 ```
 
-## USS graphs - this is largely ripped straight from Cigdem
+```{r}
+library(tidyverse)
+library(ggthemes)
+```
+
+## First we tidy up the USS data from Cigdem
 
 ```{r}
-uss_v2 <- read.delim("/Volumes/igmm/sims-lab/Cigdem/My Docs_CSelli/EU_MSCA_IF_Andy_CS_in UEDIN/analysis_new big dormancy data/Rfiles/1_patient_USS_v2.txt")
-uss_v2[uss_v2 == ""] <- NA
-unwanted <- which(uss_v2$X.volume==77.42)
-uss <- uss_v2[-unwanted,]
+edset <- read_rds("../data/edset-organised.rds")
+uss <- read.delim("../data/1_patient_USS_v2.txt")
+
+#convert empties to NA
+uss[uss == ""] <- NA
+#remove
+unwanted <- which(uss$X.volume==77.42)
+uss <- uss[-unwanted,]
+#add additional info
 uss$biopsy <- ifelse(!is.na(uss$sampling.type), 0, NA)
 uss$biopsy_days <- sapply(1:nrow(uss), function(x) {
   ifelse(!is.na(uss$sampling.type[x]), uss$days[x], NA)
 })
 uss$rec <- ifelse(uss$rec_status == 1, 1, NA)
 uss <- uss[!is.na(uss$X.volume),]
-uss_trimmed <- uss[,c(7, 11:14)]
 
+#subset for study samples only
+uss_study <- uss[as.character(uss$patient.no) %in% edset$patient_id,]
+test_that("study patients are all found in the subsetted uss dfr", {
+              expect_identical(unique(as.character(uss_study$patient.no)) %>% sort(), 
+                               unique(edset$patient_id) %>% sort())
+})
 
-#####for presentation
-#plot
-#step 1 - Dormants only
+#use dormancy status v4, which is actually found in the edset eset
+patients <- uss_study$patient.no %>% as.character() %>% unique()
+add_dfr <- lapply(patients, function(p){
+                                   dfr <- uss_study[uss_study$patient.no == p,]
+                                   is_dormant <- unique(edset$is_dormant[edset$patient_id == p])
+                                   classed_by <- unique(edset$classed_by[edset$patient_id == p])
+                                   data.frame(is_dormant = rep(is_dormant, nrow(dfr)),
+                                              classed_by = classed_by)
+}) %>% do.call(rbind, .)
+uss_study <- cbind(uss_study, add_dfr)
 
-ggplot(uss[uss$dorm.group.v2=="D",]) +
-  geom_vline(xintercept = 120, linetype = "longdash", colour="grey30") +
-  geom_hline(yintercept=50, linetype = "longdash", colour="grey30") +
-  geom_line(aes(x = days, y = X.volume, group=patient.no, colour=dorm.group.v2),
-            size=1.5, alpha = 0.7) +
-  theme_pander() +
-  #geom_smooth(aes(x = days, y = X.volume, group=dorm.group.v2), size=1.5, colour="green") +
-  scale_colour_manual(values = c("#ff6f69", "#5bc0de")) +
-  scale_y_continuous(name="Tumour volume (USS)",limits= c(0, 120),
-                     breaks=seq(0, 120, 20)) +
-  scale_x_continuous(name="Days",limits= c(0, 360),
-                     breaks=seq(0, 360, 30)) +
-  theme(axis.title = element_text(color = "black", size = 12)) +
-  theme(axis.text = element_text(size = 12)) +
-  theme(legend.position = 'none')
+#subset by useful columns and rename
+cols_to_keep <- c("patient.no", "patientID", "is_dormant", "classed_by", "days", "volume", "X.volume",
+                  "interval_lastUSS", "biopsy", "biopsy_days", "date..diagnosis", "drug.start", 
+                  "Date.of.sampling", "sampling.type")
+ussful_study <- uss_study[, cols_to_keep]
 
-##########
-#dom edit#
-##########
-#step 2 - w/Acquired Resistants
+cols_to_rename <- c("patient_id", "sample_id", "is_dormant", "classed_by", "days", "volume",
+                    "rel_volume", "interval_lastUSS", "biopsy", "biopsy_days", "date_diagnosis",
+                    "date_treatment", "date_sampling", "type_sampling")
+colnames(ussful_study) <- cols_to_rename
+#write.csv(ussful_study, "/Volumes/igmm/sims-lab/Dominic/writing/PhD/thesis/data/results/dormancy/uss-study-classification-dfr.csv")
 
-ggplot(uss[uss$dorm.group.v2!="Excl",]) +
-  geom_vline(xintercept = 120, linetype = "longdash", colour="grey30") +
-  geom_hline(yintercept=50, linetype = "longdash", colour="grey30") +
-  geom_line(aes(x = days, y = X.volume, group=patient.no, colour=dorm.group.v2, alpha = dorm.group.v2),
-            size=1.5) +
-  theme_pander() +
-  #geom_smooth(aes(x = days, y = X.volume, group=dorm.group.v2), size=1.5, colour="green") +
-  scale_colour_manual(values = c("#ff6f69", "#5bc0de")) + 
-  scale_alpha_manual(values = c(0.25, 0.8)) + 
-  scale_y_continuous(name="Tumour volume (USS)",limits= c(0, 120),
-                     breaks=seq(0, 120, 20)) +
-  scale_x_continuous(name="Days",limits= c(0, 360),
-                     breaks=seq(0, 360, 30)) +
-  theme(axis.title = element_text(color = "black", size = 12)) +
-  theme(axis.text = element_text(size = 12)) +
-  theme(legend.position = 'none')
-
-#step 3 - w/Recurrence (bu graph su an calismiyor cunku rec kolonunu sildim, rec_status olarak guncel kolon ekledim, bu  graph zaten sadece sunum icin kullanildi, gercegi yansitmiyordu) 
-
-ggplot(uss[uss$dorm.group.v2!="Excl",]) +
-  geom_vline(xintercept = 120, linetype = "longdash", colour="grey30") +
-  geom_hline(yintercept=50, linetype = "longdash", colour="grey30") +
-  geom_line(aes(x = days, y = X.volume, group=patient.no, colour=dorm.group.v2, alpha = dorm.group.v2),
-            size=1.5) +
-  geom_point(aes(x = days, y = X.volume, group=patient.no, colour=as.character(rec)),
-             size=2, pch = 15, data = uss[uss$dorm.group.v2!="Excl" & uss$days > 120,]) +
-  theme_pander() +
-  #geom_smooth(aes(x = days, y = X.volume, group=dorm.group.v2), size=1.5, colour="green") +
-  scale_colour_manual(values = c("BLACK", "#ff6f69", "#5bc0de")) +
-  scale_alpha_manual(values = c(0.25, 0.8)) + 
-  scale_y_continuous(name="Tumour volume (USS)",limits= c(0, 120),
-                     breaks=seq(0, 120, 20)) +
-  scale_x_continuous(name="Days",limits= c(0, 360),
-                     breaks=seq(0, 360, 30)) +
-  
-  theme(axis.title = element_text(color = "black", size = 12)) +
-  theme(axis.text = element_text(size = 12)) +
-  theme(legend.position = 'none')
+#For proliferation-based classification use edset and take the per-sample mean of MCM2, PCNA and MKI67
+prolset <- edset[c("MCM2", "PCNA", "MKI67"), edset$classed_by == "3prol_gene"]
+pheno <- pData(prolset)
+pheno$proliferation <- colMeans(exprs(prolset))
+#write.csv(pheno, "/Volumes/igmm/sims-lab/Dominic/writing/PhD/thesis/data/results/dormancy/3-prolif-classification-dfr.csv")
 ```
+
+## Plots
+
+### USS-based
+
+```{r}
+ggplot(ussful_study[ussful_study$classed_by == "uss",], 
+       aes(x = days, y = rel_volume, group = patient_id, colour = is_dormant)) + 
+    geom_vline(xintercept = c(120), linetype = 3) + 
+    geom_hline(yintercept = 60, linetype = 3) + 
+    geom_line(alpha = (0.6), size = 1) + 
+    scale_y_continuous(breaks = c(0, 60, 100)) +
+    scale_x_continuous(breaks = c(0, 120, 500, 1500)) +
+    scale_colour_manual(values = c("#c06c84", "#355c7d")) + 
+    theme_pander() +
+    theme(legend.position = 'bottom')
+```
+
+### Proliferation-based
+
+```{r}
+ggplot(pheno, aes(x = biopsy, y = proliferation, group = patient_id, colour = is_dormant)) + 
+    geom_line() + 
+    facet_wrap(~is_dormant) +
+    geom_line(alpha = (0.6), size = 1) + 
+    scale_colour_manual(values = c("#c06c84", "#355c7d")) + 
+    theme_pander() +
+    theme(legend.position = 'bottom')
+```
+
+

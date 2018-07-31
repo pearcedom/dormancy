@@ -28,7 +28,7 @@ library(a4Base)
 
 ```{r, eval = FALSE}
 dir_vec <- c("../data/Edinburgh\ Second\ Batch\ 170\ Samples/ff",
-             "../data/Edinburgh\ Second\ Batch\ 170\ Samples/ffpe")
+             "../data/Edinburgh\ Second\ Batch\ 170\ Samples/ffpe-w-duplicates")
 
 affybatch_lst <- lapply(dir_vec, function(dir){
                             setwd(dir)
@@ -83,4 +83,5 @@ norm_lst <- lapply(frma_lst, function(batch){
            })
 georgeset <- do.call(Biobase::combine, norm_lst)
 #write_rds(georgeset, "../output/georgeset-sep-frma-fselect-loess.rds")
+#write_rds(georgeset, "../output/georgeset-sep-frma-fselect-loess-dups-included.rds")
 ```

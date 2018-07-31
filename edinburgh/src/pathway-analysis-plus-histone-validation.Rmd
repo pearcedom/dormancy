@@ -1,0 +1,95 @@
+---
+title: Pathway Analyses 
+author: Dominic Pearce
+output:
+    github_document
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
+```
+
+```{r}
+library(ReactomePA)
+library(tidyverse)
+source("../../../../functions/convert-id-to-gene-symbol-with-biomart.R")
+source("../../../../functions/library/mdsArrange.R")
+```
+
+## Most variable 500 in treated samples
+
+```{r}
+mv_tre <- read_lines("../output/mv500-treated.txt") %>% 
+    id2GeneSymbolBM(filters = "hgnc_symbol", attributes = "entrezgene")
+
+tre_PA <- enrichPathway(gene=na.omit(unique(mv_tre$entrezgene)), pvalueCutoff=0.05, readable=T)
+dotplot(tre_PA)
+enrichMap(tre_PA, layout=igraph::layout.kamada.kawai, vertex.label.cex = 1)
+```
+
+## Long-term treated differential expression
+
+#### For this we'll get the histone-associated genes themselves, test for dorm vs. desensitised separation and validate using the georgetown data
+
+```{r}
+ltde <- read_lines("../output/rp-geneset.txt") %>% 
+    unique() %>%
+    id2GeneSymbolBM(filters = "hgnc_symbol", attributes = "entrezgene")
+
+ltde_PA <- enrichPathway(gene=na.omit(unique(ltde$entrezgene)), pvalueCutoff=0.05, readable=T)
+dotplot(ltde_PA)
+enrichMap(ltde_PA, layout=igraph::layout.kamada.kawai, vertex.label.cex = 1)
+
+ltde_res <- ltde_PA@result
+rowstograb <- ltde_res$Description %in% c("HDACs deacetylate histones", 
+                                          "DNA methylation", 
+                                          "PRC2 methylates histones and DNA", 
+                                          "HATs acetylate histones")
+histgenes_str <- ltde_res$geneID[rowstograb]
+
+histgenes <- lapply(histgenes_str, function(x) strsplit(x, "/")[[1]]) %>%
+    unlist()
+#writeLines(histgenes, "../output/histone-enriched-geneset-from-rankprod.txt")
+```
+
+## Histone geneset validation 
+
+### Edinburgh
+
+```{r}
+edset <- readRDS("../output/dorm-v4.rds")
+ed_present <- row.names(edset) %in% histgenes
+ed_arg <- mdsArrange(exprs(edset)[ed_present, edset$time.point_3cat == 4])
+ed_mrg <- merge(ed_arg, pData(edset), by = 0)
+
+ggplot(ed_mrg, aes(x = x, y = y, colour = dorm.group_v4)) + 
+    geom_hline(yintercept = 0, linetype = 3) + 
+    geom_vline(xintercept = 0, linetype = 3) + 
+    geom_point() + 
+    labs(colour = "Dormancy Status") + 
+    ggthemes::theme_pander() + 
+    theme(legend.position = 'top') + 
+    ylim(-2, 1.2)
+
+#ggsave("../figs/ed-hist-mds.png")
+```
+
+### Georgetown
+
+```{r}
+georgeset <- readRDS("../../georgetown/output/")
+histgenes_affy <- id2GeneSymbolBM(histgenes, "hgnc_symbol", "affy_hg_u133a") %>% 
+    .$affy_hg_u133a %>% 
+    unique() %>%
+    .[-1]
+george_present <- row.names(georgeset) %in% histgenes_affy
+george_arg <- mdsArrange(exprs(georgeset)[george_present, which(georgeset$timepoint == "long-term")])
+george_mrg <- merge(george_arg, pData(georgeset), by = 0)
+
+ggplot(george_mrg, aes(x = x, y = y, colour = is_dormant)) + 
+    geom_hline(yintercept = 0, linetype = 3) + 
+    geom_vline(xintercept = 0, linetype = 3) + 
+    geom_point() + 
+    ggthemes::theme_pander()
+```
+

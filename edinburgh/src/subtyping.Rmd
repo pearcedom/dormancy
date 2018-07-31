@@ -11,43 +11,41 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align =
 
 ```{r}
 library(tidyverse)
+library(transcripTools)
 library(genefu)
 library(AIMS)
 library(pamr)
 library(Biobase)
 library(ggthemes)
 library(cowplot); theme_set(theme_grey())
-source("/Volumes/igmm/sims-lab/Dominic/functions/idReplace.R")
 ```
 
 ```{r}
-eset <- read_rds("../output/dorm-v4.rds")
+edset <- read_rds("../output/edset-organised.rds")
+edset$is_dormant <- ifelse(edset$is_dormant, "Dormant", "Desensitised")
+edset$treatment <- Hmisc::capitalize(edset$treatment)
 ```
 
-## Convert to entrezgene ids (genefu requires this) and package as a new eset
+## Convert to entrezgene ids (genefu requires this) and package as a new edset
 
 ```{r}
-xpr_entrez <- idReplace(exprs(eset), id.in = "hgnc_symbol", id.out = "entrezgene")
-phenoData <- new("AnnotatedDataFrame", data = pData(eset),  varMetadata = varMetadata(eset))
-eset_entrez <- new("ExpressionSet", exprs = as.matrix(xpr_entrez), phenoData = phenoData)
+xpr_entrez <- idReplace(exprs(edset), id.in = "hgnc_symbol", id.out = "entrezgene")
+phenoData <- new("AnnotatedDataFrame", data = pData(edset),  varMetadata = varMetadata(edset))
+edset_entrez <- new("ExpressionSet", exprs = as.matrix(xpr_entrez), phenoData = phenoData)
 ```
 
 ## Calculate subtypes
 
 ```{r}
-ano_dfr <- data.frame(probe = row.names(eset_entrez), 
-                      EntrezGene.ID = row.names(eset_entrez), 
-                      rownames = row.names(eset_entrez))
+ano_dfr <- data.frame(probe = row.names(edset_entrez), 
+                      EntrezGene.ID = row.names(edset_entrez), 
+                      rownames = row.names(edset_entrez))
 
-ssp_lst <- list(ssp2003, ssp2006, pam50)
-names(ssp_lst) <- c("sorlie2003", "hu2006", "pam50")
-
-preds_base <- lapply(c("sorlie2003", "hu2006", "pam50"), function(ssp){
-           dfr <- data.frame(pred = intrinsic.cluster.predict(ssp_lst[[ssp]], t(exprs(eset_entrez)), ano_dfr, do.mapping = TRUE)$subtype,
-                             method = ssp)
-           dfr$sample <- row.names(dfr)
-           dfr
-                      }) %>% do.call(rbind, .)
+preds_base <- data.frame(pred = intrinsic.cluster.predict(pam50, 
+                                                          t(exprs(edset_entrez)), 
+                                                          ano_dfr, do.mapping = TRUE)$subtype,
+                         method = "pam50")
+preds_base$sample <- row.names(preds_base)
 row.names(preds) <- NULL
 ```
 
@@ -55,26 +53,33 @@ row.names(preds) <- NULL
 
 ```{r}
 preds <-  preds_base[which(!grepl("e", preds_base$sample)),]
+
+gsub("-.", "", preds$sample) %>% unique %>% length
+
 ```
 
 ## Combine with phenoData
 
 ```{r}
-preds_mrg <- merge(preds, pData(eset_entrez), by.x = "sample", by.y = "ID_D120days_3cat")
-preds_mrg$timep <- ifelse(preds_mrg$time.point_3cat == 1, "Diagnosis", ifelse(preds_mrg$time.point_3cat == 2, "On-treatment", "Long-term"))
-preds_mrg$time_tile <- factor(preds_mrg$timep, levels = c("Long-term", "On-treatment", "Diagnosis"))
-preds_mrg$time_hist <- factor(preds_mrg$timep, levels = c("Diagnosis", "On-treatment", "Long-term"))
+preds_mrg <- merge(preds, pData(edset_entrez), by.x = "sample", by.y = "sample_id")
+#preds_mrg$timep <- ifelse(preds_mrg$time.point_3cat == 1, "Diagnosis", ifelse(preds_mrg$time.point_3cat == 2, "On-treatment", "Long-term"))
+preds_mrg$time_tile <- factor(preds_mrg$treatment, levels = c("Extended", "Early", "Diagnostic"))
+preds_mrg$time_hist <- factor(preds_mrg$treatment, levels = c("Diagnostic", "Early", "Extended"))
 
 #order by time to final biopsy
-tmp <- preds_mrg[preds_mrg$time.point_3cat == 4 & preds_mrg$method == "pam50",]
-preds_mrg$patient.no <- factor(preds_mrg$patient.no, levels = tmp$patient.no[order(tmp$days_newinfo)])
+tmp <- lapply(unique(preds_mrg$patient_id), function(p){
+                  dfr <- preds_mrg[preds_mrg$patient_id == p,]
+                  dfr[nrow(dfr),]
+             }) %>% do.call(rbind, .)
+preds_mrg$patient_id <- factor(preds_mrg$patient_id, levels = tmp$patient_id[order(tmp$time_treated)])
 
+write.csv(preds_mrg, "/Volumes/igmm/sims-lab/Dominic/writing/PhD/thesis/data/results/dormancy/subtyping-dfr.csv")
 
-p_tile <- ggplot(preds_mrg[preds_mrg$method == "pam50",], aes(patient.no, y = time_tile, fill = pred)) + 
+p_tile <- ggplot(preds_mrg, aes(patient_id, y = time_tile, fill = pred)) + 
     geom_tile(width = 1, colour = "WHITE") + 
     scale_fill_manual(values=c("#1f78b4", "#a6cee3", "#fb9a99", "#e31a1c", "#b2df8a"), 
                     limits=c("LumA", "LumB", "Her2", "Basal", "Normal")) +
-    facet_grid(method~dorm.group_v4, scales = 'free', space = 'free') +
+    facet_grid(~is_dormant, scales = 'free', space = 'free') +
     labs(fill = "Subtype") + 
     ggthemes::theme_pander() + 
     theme(axis.title.y = element_blank(),
@@ -96,7 +101,7 @@ p_hist <- ggplot(preds_mrg[preds_mrg$method == "pam50",], aes(x = pred, fill = p
                     limits=c("LumA", "LumB", "Her2", "Basal", "Normal")) +
     theme_pander() + 
     theme(legend.position = 'none') + 
-    facet_grid(dorm.group_v4 ~ time_hist, scale = 'free_y')
+    facet_grid(is_dormant ~ time_hist)
 p_hist
 ```
 

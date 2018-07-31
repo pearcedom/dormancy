@@ -1,5 +1,5 @@
 ---
-title: 
+title: Differential expression
 author: Dominic Pearce
 output:
     github_document
@@ -19,7 +19,7 @@ library(ggthemes)
 ```
 
 ```{r}
-dorm <- read_rds("../output/dorm.rds")
+dorm <- read_rds("../output/dorm-v4.rds")
 ```
 
 # Within groups

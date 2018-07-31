@@ -13,104 +13,39 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align =
 library(tidyverse)
 library(testthat)
 library(Biobase)
+library(transcripTools)
 library(ggthemes)
 library(ggdendro)
 library(knitr)
 library(broom)
 library(viridis)
 library(cowplot); theme_set(theme_grey())
-source("./../../../functions/library/mdsArrange.R")
-source("./../../../functions/mostVar.R")
-source("./../../../functions/library/heatmapArrange.R")
 ```
 
 ```{r}
-#dorm_base <- read_rds("../output/1_Dorm_120_hgnc_v2_3cat.Rds")
-#remove Exluded samples immediately and write
-#dorm <- dorm_base[, dorm_base$dorm.group_v3 != "Excl"]
-#write_rds(dorm, "./output/dorm.rds")
-dorm <- read_rds("../output/dorm.rds")
+edset <- read_rds("../output/edset-organised.rds")
+edset$is_dormant <- ifelse(edset$is_dormant, "Dormant", "Desensitised")
 ```
 
-### Dormancy comparison plotting function
-
-```{r}
-dormPlot <- function(mds_input){
-    p1a <- ggplot(mds_input, aes(x = x, y = y, colour = as.character(time.point_3cat))) + 
-        geom_point() + 
-        ggtitle("Time Point") + 
-        theme_pander() + 
-        theme(legend.position = 'none')
-    p1b <- ggplot(mds_input, aes(x = as.character(time.point_3cat), y = x, 
-                                 fill = as.character(time.point_3cat))) +
-        geom_boxplot(notch = TRUE) + 
-        theme_pander() + 
-        theme(legend.position = 'none') + 
-        coord_flip()
-
-    p2a <- ggplot(mds_input, aes(x = x, y = y, colour = sampling.type)) + 
-        geom_point() + 
-        ggtitle("Sampling Type") + 
-        theme_pander() + 
-        theme(legend.position = 'none')
-    p2b <- ggplot(mds_input, aes(x = sampling.type, y = x, fill = sampling.type)) +
-        geom_boxplot(notch = TRUE) + 
-        theme_pander() + 
-        theme(legend.position = 'none') + 
-        coord_flip()
-    
-    p3a <- ggplot(mds_input, aes(x = x, y = y, colour = dorm.group_v3)) + 
-        geom_point() + 
-        ggtitle("Dormancy Group") + 
-        theme_pander() + 
-        theme(legend.position = 'none')
-    p3b <- ggplot(mds_input, aes(x = dorm.group_v3, y = x, fill = dorm.group_v3)) +
-        geom_boxplot(notch = TRUE) + 
-        theme_pander() + 
-        theme(legend.position = 'none') + 
-        coord_flip()
-    
-    p4 <- ggplot(mds_input, aes(y = x, x = days_newinfo, colour = as.character(time.point_3cat))) + 
-        geom_point() + 
-        stat_smooth(method = 'lm', aes(group = 1), size = 0.5, se = FALSE, colour = "BLACK") +
-        ggtitle("Time Point") + 
-        theme_pander() + 
-        theme(legend.position = 'bottom')
-    p5 <- ggplot(mds_input, aes(y = x, x = days_newinfo, colour = sampling.type)) + 
-        geom_point() +
-        stat_smooth(method = 'lm', aes(group = 1), size = 0.5, se = FALSE, colour = "BLACK") +
-        ggtitle("Sampling Type") + 
-        theme_pander() + 
-        theme(legend.position = 'bottom')
-    
-    p1 <- plot_grid(p1a, p1b, ncol = 1, rel_heights = c(2, 1))
-    p2 <- plot_grid(p2a, p2b, ncol = 1, rel_heights = c(2, 1))
-    p3 <- plot_grid(p3a, p3b, ncol = 1, rel_heights = c(2, 1))
-    pg1 <- plot_grid(p1, p2, p3, nrow = 1)
-    pg2 <- plot_grid(p4, p5, nrow = 1)
-    plot_grid(pg1, pg2, ncol = 1)
-}
-```
-
-### Calculate most variant genes using all samples and also excluding pre-treatment timepoint and subset esets
+### Calculate most variant genes using all samples and also excluding pre-treatment timepoint, subset esets and arrange for PCA/tSNE
 
 #### All samples
 
 ```{r}
-mv_genes <- mostVar(exprs(dorm), 100) %>% row.names()
-mv_dorm <- dorm[mv_genes,]
+mv_genes <- mostVar(exprs(edset), 100) %>% row.names()
+mv_dorm <- edset[mv_genes,]
 ```
 
 #### Treated samples
 
 ```{r}
-tre <- dorm[, dorm$time.point_3cat != 1]
+tre <- edset[, edset$treatment != "diagnostic"]
 mv_genes_tre <- mostVar(exprs(tre), 100) %>% row.names()
 mv_tre <- tre[mv_genes_tre,]
 ```
 
 ```{r tests1, echo = FALSE}
-expect_identical(ncol(dorm), ncol(tre) + dorm$time.point_3cat %>% table %>% .["1"]) #test
+expect_identical(ncol(edset), ncol(tre) + edset$treatment %>% table %>% .["diagnostic"]) #test
 expect_false(identical(mv_genes, mv_genes_tre)) #test
 ```
 
@@ -120,30 +55,92 @@ expect_false(identical(mv_genes, mv_genes_tre)) #test
 mds_dorm <- merge(mdsArrange(exprs(mv_dorm)), pData(mv_dorm), by.x = "ids", by.y = 0)
 mds_tre <- merge(mdsArrange(exprs(mv_tre)), pData(mv_tre), by.x = "ids", by.y = 0)
 
-mds_dorm_4 <- merge(mdsArrange(exprs(mv_dorm[, mv_dorm$time.point_3cat == 4])), pData(mv_dorm), by.x = "ids", by.y = 0)
-mds_tre_4 <- merge(mdsArrange(exprs(mv_tre[, mv_tre$time.point_3cat == 4])), pData(mv_tre), by.x = "ids", by.y = 0)
+mds_dorm_4 <- merge(mdsArrange(exprs(mv_dorm[, mv_dorm$treatment == 4])), pData(mv_dorm), by.x = "ids", by.y = 0)
+mds_tre_4 <- merge(mdsArrange(exprs(mv_tre[, mv_tre$treatment == 4])), pData(mv_tre), by.x = "ids", by.y = 0)
 ```
+### Dormancy comparison plotting function
+
+```{r}
+dormPlot <- function(mds_input){
+    p1a <- ggplot(mds_input, aes(x = x, y = y, colour = treatment)) + 
+        geom_point() + 
+        ggtitle("Time Point") + 
+        theme_pander() + 
+        theme(legend.position = 'none')
+    p1b <- ggplot(mds_input, aes(x = as.character(treatment), y = x, 
+                                 fill = as.character(treatment))) +
+        geom_boxplot(notch = TRUE) + 
+        theme_pander() + 
+        theme(legend.position = 'none') + 
+        coord_flip()
+
+    p2a <- ggplot(mds_input, aes(x = x, y = y, colour = biopsy_type)) + 
+        geom_point() + 
+        ggtitle("Sampling Type") + 
+        theme_pander() + 
+        theme(legend.position = 'none')
+    p2b <- ggplot(mds_input, aes(x = biopsy_type, y = x, fill = biopsy_type)) +
+        geom_boxplot(notch = TRUE) + 
+        theme_pander() + 
+        theme(legend.position = 'none') + 
+        coord_flip()
+
+    p3a <- ggplot(mds_input, aes(x = x, y = y, colour = is_dormant)) + 
+        geom_point() + 
+        ggtitle("Dormancy Group") + 
+        theme_pander() + 
+        theme(legend.position = 'none')
+    p3b <- ggplot(mds_input, aes(x = is_dormant, y = x, fill = is_dormant)) +
+        geom_boxplot(notch = TRUE) + 
+        theme_pander() + 
+        theme(legend.position = 'none') + 
+        coord_flip()
+
+    p4 <- ggplot(mds_input, aes(y = x, x = time_treated, colour = as.character(treatment))) + 
+        geom_point() + 
+        stat_smooth(method = 'lm', aes(group = 1), size = 0.5, se = FALSE, colour = "BLACK") +
+        ggtitle("Time Point") + 
+        theme_pander() + 
+        theme(legend.position = 'bottom')
+    p5 <- ggplot(mds_input, aes(y = x, x = time_treated, colour = biopsy_type)) + 
+        geom_point() +
+        stat_smooth(method = 'lm', aes(group = 1), size = 0.5, se = FALSE, colour = "BLACK") +
+        ggtitle("Sampling Type") + 
+        theme_pander() + 
+        theme(legend.position = 'bottom')
+
+    p1 <- plot_grid(p1a, p1b, ncol = 1, rel_heights = c(2, 1))
+    p2 <- plot_grid(p2a, p2b, ncol = 1, rel_heights = c(2, 1))
+    p3 <- plot_grid(p3a, p3b, ncol = 1, rel_heights = c(2, 1))
+    pg1 <- plot_grid(p1, p2, p3, nrow = 1)
+    pg2 <- plot_grid(p4, p5, nrow = 1)
+    plot_grid(pg1, pg2, ncol = 1)
+}
+```
+
 
 ### Plots
 
 #### All Sample
 
 ```{r}
-dormPlot(mds_dorm)
+p1 <- dormPlot(mds_dorm)
+goff(); p1
 
-wilcox.test(x ~ dorm.group_v3, data = mds_dorm) %>% tidy() %>% kable()
-t.test(x ~ dorm.group_v3, data = mds_dorm) %>% tidy() %>% kable()
-lm(x ~ days_newinfo, data = mds_dorm) %>% summary() %>% tidy() %>% kable()
+wilcox.test(x ~ is_dormant, data = mds_dorm) %>% tidy() %>% kable()
+t.test(x ~ is_dormant, data = mds_dorm) %>% tidy() %>% kable()
+lm(x ~ time_treated, data = mds_dorm) %>% summary() %>% tidy() %>% kable()
 ```
 
 #### Treated
 
 ```{r}
-dormPlot(mds_tre)
+p2 <- dormPlot(mds_tre)
+goff(); p2
 
-wilcox.test(x ~ dorm.group_v3, data = mds_tre) %>% tidy() %>% kable()
-t.test(x ~ dorm.group_v3, data = mds_tre) %>% tidy() %>% kable()
-lm(x ~ days_newinfo, data = mds_tre) %>% summary() %>% tidy() %>% kable()
+wilcox.test(x ~ is_dormant, data = mds_tre) %>% tidy() %>% kable()
+t.test(x ~ is_dormant, data = mds_tre) %>% tidy() %>% kable()
+lm(x ~ time_treated, data = mds_tre) %>% summary() %>% tidy() %>% kable()
 ```
 
 #### Note: This is not significant if the treated mv500 genes are used to subset all samples (i.e. including pre-treatment samples). I would guess this is because treatment is overshadowing everything else that it becomes difficult to see the dormant/desnesitised signal.
@@ -153,8 +150,8 @@ lm(x ~ days_newinfo, data = mds_tre) %>% summary() %>% tidy() %>% kable()
 ```{r}
 dormPlot(mds_dorm_4)
 
-wilcox.test(x ~ dorm.group_v3, data = mds_dorm_4) %>% tidy() %>% kable() 
-t.test(x ~ dorm.group_v3, data = mds_dorm_4) %>% tidy() %>% kable() 
+wilcox.test(x ~ is_dormant, data = mds_dorm_4) %>% tidy() %>% kable() 
+t.test(x ~ is_dormant, data = mds_dorm_4) %>% tidy() %>% kable() 
 ```
 
 #### Treated mv500, timepoint 4 plot subset
@@ -162,8 +159,8 @@ t.test(x ~ dorm.group_v3, data = mds_dorm_4) %>% tidy() %>% kable()
 ```{r}
 dormPlot(mds_tre_4)
 
-wilcox.test(x ~ dorm.group_v3, data = mds_tre_4) %>% tidy() %>% kable()
-t.test(x ~ dorm.group_v3, data = mds_tre_4) %>% tidy() %>% kable()
+wilcox.test(x ~ is_dormant, data = mds_tre_4) %>% tidy() %>% kable()
+t.test(x ~ is_dormant, data = mds_tre_4) %>% tidy() %>% kable()
 ```
 
 ### OK, looks good at timpoint 4, what about timepoint 2?
@@ -171,12 +168,12 @@ t.test(x ~ dorm.group_v3, data = mds_tre_4) %>% tidy() %>% kable()
 #### (Using treated mv500)
 
 ```{r}
-mds_tre_2 <- merge(mdsArrange(exprs(mv_tre[, mv_tre$time.point_3cat == 2])), pData(mv_tre), by.x = "ids", by.y = 0)
+mds_tre_2 <- merge(mdsArrange(exprs(mv_tre[, mv_tre$treatment == 2])), pData(mv_tre), by.x = "ids", by.y = 0)
 
 dormPlot(mds_tre_2)
 
-wilcox.test(x ~ dorm.group_v3, data = mds_tre_2) %>% tidy() %>% kable()
-t.test(x ~ dorm.group_v3, data = mds_tre_2) %>% tidy() %>% kable()
+wilcox.test(x ~ is_dormant, data = mds_tre_2) %>% tidy() %>% kable()
+t.test(x ~ is_dormant, data = mds_tre_2) %>% tidy() %>% kable()
 ```
 
 #### Non-significant unfortunately
@@ -204,7 +201,7 @@ pa <- ggplot(hmap_tre, aes(x = variable, y = row_value, fill = value)) +
     theme_void() + 
     theme(legend.position = 'none')
 
-pb <- ggplot(hmap_tre, aes(x = variable, y = dorm.group_v3, fill = dorm.group_v3)) + 
+pb <- ggplot(hmap_tre, aes(x = variable, y = is_dormant, fill = is_dormant)) + 
     geom_tile() +
     theme_void() + 
     theme(legend.position = 'bottom')
@@ -222,13 +219,13 @@ plot_grid(pc, pa, pb, ncol = 1, align = 'v', rel_heights = c(4, 6, 1))
 
 ```{r}
 hmap_4 <- merge(
-                  heatmapArrange(exprs(mv_tre[,mv_tre$time.point_3cat == 4]), cluster_row = TRUE, cluster_column = TRUE),
-                  pData(mv_tre[mv_tre$time.point_3cat == 4]),
+                  heatmapArrange(exprs(mv_tre[,mv_tre$treatment == 4]), cluster_row = TRUE, cluster_column = TRUE),
+                  pData(mv_tre[mv_tre$treatment == 4]),
                   by.x = "variable",
                   by.y = 0
                   )
 
-clst_4 <- hclust(as.dist(1-cor(exprs(mv_tre[,mv_tre$time.point_3cat == 4]), method = "pearson")), method = "complete", members = NULL)
+clst_4 <- hclust(as.dist(1-cor(exprs(mv_tre[,mv_tre$treatment == 4]), method = "pearson")), method = "complete", members = NULL)
 hcdata_4 <- dendro_data(clst_4, type="rectangle")
 ```
 
@@ -239,7 +236,7 @@ pa4 <- ggplot(hmap_4, aes(x = variable, y = row_value, fill = value)) +
     theme_void() + 
     theme(legend.position = 'none')
 
-pb4 <- ggplot(hmap_4, aes(x = variable, y = dorm.group_v3, fill = dorm.group_v3)) + 
+pb4 <- ggplot(hmap_4, aes(x = variable, y = is_dormant, fill = is_dormant)) + 
     geom_tile() +
     theme_void() + 
     theme(legend.position = 'bottom')

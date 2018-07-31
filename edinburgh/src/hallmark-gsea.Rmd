@@ -1,0 +1,139 @@
+---
+title: Hallmarks GSEA
+author: Dominic Pearce
+output:
+    github_document
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center', 
+                      fig.width = 9, fig.height = 6.5)
+```
+
+<!--
+//TODO  -When having two scores with the same name its average was used. 
+        -Zeros were removed. 
+        -Scores without names (which can not be in any signature) removed. 
+        -Non complete cases (i.e. NAs, NaNs) were removed
+        -Doesn't work when only given a single geneset
+-->
+
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(ggplot2)
+library(GSEABase)
+library(phenoTest)
+library(testthat)
+library(ggthemes)
+```
+
+```{r}
+edset <- read_rds("../output/edset-organised.rds")
+```
+
+#### Here we're going to compare enrichment of the [Hallmark genesets](https://www.ncbi.nlm.nih.gov/pubmed/26771021) between dormant and desensitised patients.
+
+### Functions
+
+#### Geneset arrangement
+
+```{r}
+arrangeGenesets <- function(GMT){
+    genesets <- geneIds(GMT)
+    intersets <- lapply(genesets, function(set){
+                            intersect(set, row.names(edset))
+    })
+    intersets
+}
+```
+
+#### GSEA calculation functions (for unpaired and paired comparisons)
+
+```{r}
+arrangeGSEA <- function(gsea_out, comparison = NA, dormancy = NA){
+    dfr <- data.frame(summary(gsea_out)[, c("nes", "fdr")])
+    dfr[dfr$fdr >= 0.05, "nes"] <- NA
+    dfr$hallmark <- row.names(dfr)
+    dfr$comparison <- comparison
+    dfr$dormancy <- dormancy
+    dfr$direction <- ifelse(grepl("UP$", dfr$hallmark), "UP", 
+           ifelse(grepl("DN$", dfr$hallmark), "DOWN", "EITHER"))
+    dfr
+}
+```
+
+#### Unpaired (i.e. between class) GSEA calculation
+
+```{r}
+arrangeUnpairedGSEA <- function(eset, geneset){
+    #separate into dormants and desensitiseds
+    dorm_xpr <- exprs(eset[, which(eset$is_dormant)]) %>% rowMeans()
+    dssd_xpr <- exprs(eset[, which(!eset$is_dormant)]) %>% rowMeans()
+    #calculate fold-change - this orientation is relative to desensitiseds
+    fc_vec <- sort(dssd_xpr - dorm_xpr)
+
+    test_that("test that our vector meets the phenoTest reccomended specs", {
+        expect_false(unique(fc_vec %>% is.na()))
+        expect_false(unique(fc_vec == 0))
+        #even at 15 decimals points, for all genes there are value ties but they're such a small
+        #percentage of all genes that I don't think it is critical to the results here
+    })
+    #perform GSEA and arrange for plotting
+    geneset_out <- gsea(x = fc_vec, gsets = geneset, logScale = FALSE)
+    arrangeGSEA(geneset_out, comparison = "Dormant-Desensitised")
+} 
+```
+
+#### Plot the unpaired calculations, both as a whole but also split by treatment timepoint
+
+```{r}
+plotUnpaired <- function(x){
+    ggplot(x, aes(x = comparison, y = hallmark, fill = nes)) + 
+            geom_tile(colour = "white") +
+            scale_fill_gradientn(values=c(1, .7, .5, .3, 0), colours=rev(c("#4eb3d3", "#a8ddb5", "white", "#fee391", "#fe9929")), na.value = "white") +
+            labs(title = "GSEA : Dormant vs. Desensitised", subtitle = "Enrichment is relative to acquired resistant patients") 
+}
+
+plotUnpairedSplit <- function(geneset){ 
+        plot_dfr <- lapply(c("diagnostic", "early", "extended"), function(x) {
+        dfr <- arrangeUnpairedGSEA(edset[, which(edset$treatment == x)], geneset) 
+        dfr$timepoint <- factor(x, levels = c("diagnostic", "early", "extended"))
+        dfr
+        }) %>% do.call(rbind, .) 
+        ggplot(plot_dfr, aes(x = timepoint, y = hallmark, fill = nes)) +
+            geom_tile(colour = "#f0f0f0") + 
+            scale_fill_gradientn(values=c(1, .7, .5, .3, 0), colours=rev(c("#4eb3d3", "#a8ddb5", "white", "#fee391", "#fe9929")), na.value = "white") +
+            scale_x_discrete(labels = c("Diagnostic", "Early-on", "Extended")) + 
+            theme_pander()
+} 
+```
+
+
+### Analysis
+
+#### First we'll assemble the Hallmark and cancer-specific genesets, as a sensible easy to use list of ids that are present in `edset`.
+
+```{r}
+hallmarks <- getGmt("../../combined/data/h.all.v6.1.symbols.gmt") %>% arrangeGenesets()
+names(hallmarks) <- gsub("HALLMARK ", "", gsub("_", " ", names(hallmarks)))
+```
+
+#### We'll begin with an unpaired comparison, by arranging our data as two sets - dormants & desensitiseds - calculating the significant **NES** scores, and plotting.
+
+### Plots
+
+```{r, fig.width = 5.5}
+#hallmarks
+hallmarks_out <- arrangeUnpairedGSEA(edset, hallmarks)
+hallmarks_out %>%
+        plotUnpaired()
+```
+
+#### We can then split our dormant vs. desensitised comparison by timepoint
+
+```{r}
+plotUnpairedSplit(hallmarks)
+```
+

@@ -1,0 +1,60 @@
+---
+title: Data munging
+author: Dominic Pearce
+output:
+    github_document
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center', eval = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(Biobase)
+library(transcripTools)
+```
+
+```{r}
+edset_in <- read_rds("../data/1_Dorm_pfq_3cat_hgnc.Rds")
+edset <- edset_in[, edset_in$dorm.group_v4 != "Excl"]
+
+edset$treatment <- ifelse(grepl(1, edset$time.point_3cat), "diagnostic",
+                          ifelse(grepl(2, edset$time.point_3cat), "early",
+                                 "extended"))
+
+pheno <- pData(edset)[, c("patient.no", "ID_D120days_3cat", "biopsy.no", 
+                          "treatment", "sampling.type", "days_newinfo", 
+                          "T", "N", "M", "Grade", "ER", "HER_myfinaldecision", 
+                          "prog_status_v3", "time_to_prog", 
+                          "recur.status", "timetorec_v2",  "recur.type", "Death", 
+                          "Osurvival", "BCSpecific", "DFS", "study.type", 
+                          "dorm.group_v4", "dg_v4_criteria", "timetolastUSS")]
+colnames(pheno) <- c("patient_id", "sample_id", "biopsy", "treatment",
+                     "biopsy_type", "time_treated", "t", "n", "m", "grade", 
+                     "allred", "her2", "e_progression", "t_progression", 
+                     "e_recur", "t_recur", "type_recur", "e_os", 
+                     "t_os", "e_dfs", "t_dfs", "study_type", "is_dormant", "classed_by", 
+                     "time_lastuss")
+
+pheno$biopsy_type[pheno$biopsy_type == "TH"] <- "EB"
+pheno$type_recur[pheno$type_recur == "0"] <- NA
+pheno$is_dormant <- !grepl("ND", pheno$is_dormant)
+pheno$biopsy <- as.character(pheno$biopsy)
+pheno$grade <- as.numeric(pheno$grade)
+
+unknown_vec <- c("t", "n", "m", "grade", "her2", "e_recur", "t_recur", 
+                "type_recur", "e_os", "t_os", "e_dfs", "t_dfs")
+for(i in unknown_vec){
+    pheno[[i]][which(pheno[[i]] == "Unknown")] <- NA
+}
+
+to_numeric <- c("e_recur", "t_recur", "e_os", "t_os", "e_dfs", "t_dfs")
+for(i in to_numeric){
+    pheno[,i] <- as.numeric(pheno[,i])
+}
+
+mungeset <- quickBuildeSet(exprs(edset), pheno)
+#write_rds(mungeset, "../data/edset-organised.rds")
+```
+
